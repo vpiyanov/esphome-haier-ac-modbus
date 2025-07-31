@@ -229,6 +229,12 @@ status_led:
 
 # Additional sensors for monitoring
 sensor:
+  - platform: internal_temperature
+    id: mcu_temperature_sensor
+    name: "MCU Temperature"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
   - platform: template
     name: "Current Temperature"
     lambda: |-
@@ -624,3 +630,11 @@ modbus_controller:
           std::string stop_bits = std::to_string(x);
           id(modbus_stop_bits).make_call().set_option(stop_bits).perform();
           return true;
+
+      # Input registers:
+      
+      # Input 124 - MCU Temperature
+      - address: 124
+        value_type: S_WORD
+        read_lambda: |-
+          return id(mcu_temperature_sensor).state * 10;  // Scale to 0.1 degree resolution
