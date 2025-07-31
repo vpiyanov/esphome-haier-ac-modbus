@@ -131,6 +131,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
 
+  - platform: restart
+    id: restart_switch
+    name: "Restart Device"
+
 select:
   - id: modbus_baud_rate
     name: "[Modbus Holding 110] Baud rate"
@@ -631,6 +635,39 @@ modbus_controller:
           id(modbus_stop_bits).make_call().set_option(stop_bits).perform();
           return true;
 
+      # Holding 120 - Reboot device
+      - address: 120
+        value_type: U_WORD
+        read_lambda: |-
+          return 0;
+        write_lambda: |-
+          if (x == 1) {
+            ESP_LOGW("modbus_reboot", "Reboot requested via Modbus register 120");
+            id(restart_switch).turn_on();
+            return true;
+          }
+          return false;
+
+      # Holding 200 - HW Version
+      - address: 200
+        value_type: U_WORD
+        read_lambda: return 0;
+
+      # Holding 201 - HW Version
+      - address: 201
+        value_type: U_WORD
+        read_lambda: return 0;
+
+      # Holding 250 - FW Version
+      - address: 250
+        value_type: U_WORD
+        read_lambda: return 0;
+
+      # Holding 270 - Serial
+      - address: 270
+        value_type: U_WORD
+        read_lambda: return 0;
+
       # Input registers:
       
       # Input 124 - MCU Temperature
@@ -638,3 +675,13 @@ modbus_controller:
         value_type: S_WORD
         read_lambda: |-
           return id(mcu_temperature_sensor).state * 10;  // Scale to 0.1 degree resolution
+
+      # Input 290 - Signature
+      - address: 290
+        value_type: U_WORD
+        read_lambda: return 0;
+
+      # Input 400 - PROTO Version
+      - address: 400
+        value_type: U_WORD
+        read_lambda: return 0;
