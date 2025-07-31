@@ -135,6 +135,28 @@ switch:
     id: restart_switch
     name: "Restart Device"
 
+# Buttons for Modbus address control
+button:
+  - platform: template
+    id: apply_modbus_address_button
+    name: "Apply Modbus Address"
+    on_press:
+      - lambda: |-
+          uint8_t address = (uint8_t)id(modbus_address_number).state;
+          ESP_LOGI("modbus_address", "Applying Modbus address: %d", address);
+          id(modbus_controller_server).set_address(address);
+
+  - platform: template
+    id: reset_modbus_address_button
+    name: "Reset Modbus Address to Default"
+    on_press:
+      - number.set:
+          id: modbus_address_number
+          value: 31  # 0x1F
+      - lambda: |-
+          ESP_LOGI("modbus_address", "Resetting Modbus address to default: 31");
+          id(modbus_controller_server).set_address(31);
+
 select:
   - id: modbus_baud_rate
     name: "[Modbus Holding 110] Baud rate"
@@ -227,6 +249,21 @@ number:
     optimistic: true
     unit_of_measurement: "°C"
 
+  - platform: template
+    id: modbus_address_number
+    name: "Modbus Address"
+    min_value: 1
+    max_value: 247
+    initial_value: 1
+    step: 1
+    restore_value: true
+    optimistic: true
+    set_action:
+      - lambda: |-
+          ESP_LOGI("modbus_address", "Changing Modbus address to %d", x);
+          id(modbus_controller_server).set_address(x);
+          ESP_LOGI("modbus_address", "Modbus address successfully changed to %d", x);
+
 # Status LED
 status_led:
   pin: GPIO2
@@ -290,6 +327,7 @@ text_sensor:
 # Modbus controller with server registers based on ONOKOM-AIR-HR-1-MB-B specification
 modbus_controller:
   - modbus_id: modbus_server
+    id: modbus_controller_server
     address: 0x1F  # Modbus device address
     server_registers:
       # Coil registers:
@@ -644,6 +682,19 @@ modbus_controller:
           if (x == 1) {
             ESP_LOGW("modbus_reboot", "Reboot requested via Modbus register 120");
             id(restart_switch).turn_on();
+            return true;
+          }
+          return false;
+
+      # Holding 128 - Modbus Address
+      - address: 128
+        value_type: U_WORD
+        read_lambda: |-
+          return id(modbus_address_number).state;
+        write_lambda: |-
+          if (x >= 1 && x <= 247) {
+            id(modbus_address_number).make_call().set_value((float)x).perform();
+            ESP_LOGI("modbus_address", "Modbus address changed via Modbus to: %d", x);
             return true;
           }
           return false;
