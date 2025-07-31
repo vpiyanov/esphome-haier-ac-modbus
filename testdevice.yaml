@@ -106,18 +106,101 @@ switch:
     turn_off_action:
       - climate.haier.display_off: haier_ac
 
-  # Used to store Modbus register value:
+  # Used to store Modbus register values:
+  - platform: template
+    id: modbus_show_fan_as_range
+    name: "[Modbus Coil 92] Show fan as range"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+
+  - platform: template
+    id: modbus_show_vanes_as_range
+    name: "[Modbus Coil 93] Show vanes as range"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+
+  - platform: template
+    id: modbus_show_thermostat_state_as_range
+    name: "[Modbus Coil 94] Show thermostat state as range"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+
   - platform: template
     id: modbus_show_modes_as_range
     name: "[Modbus Coil 95] Show modes as range"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
 
-  - platform: template
-    id: modbus_show_fan_as_range
-    name: "[Modbus Coil 92] Show fan as range"
-    restore_mode: RESTORE_DEFAULT_OFF
+select:
+  - id: modbus_baud_rate
+    name: "[Modbus Holding 110] Baud rate"
+    platform: template
+    options:
+      - "2400"
+      - "9600"
+      - "38400"
+      - "57600"
+      - "115200"
+      - "256000"
+      - "512000"
+      - "921600"
+    initial_option: "9600"
     optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          uint32_t new_baud_rate = stoi(x);
+          ESP_LOGD("modbus_baud_rate", "Changing baud rate from %i to %i", id(modbus_uart).get_baud_rate(), new_baud_rate);
+          if (id(modbus_uart).get_baud_rate() != new_baud_rate) {
+            id(modbus_uart).flush();
+            id(modbus_uart).set_baud_rate(new_baud_rate);
+            id(modbus_uart).load_settings();
+          }
+
+  - id: modbus_parity_bit
+    name: "[Modbus Holding 111] Parity Bit"
+    platform: template
+    options:
+      - "None"
+      - "Odd"
+      - "Even"
+    initial_option: "None"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          UARTParityOptions new_parity = UART_CONFIG_PARITY_NONE;
+          if (x == "Odd") {
+            new_parity = UART_CONFIG_PARITY_ODD;
+          } else if (x == "Even") {
+            new_parity = UART_CONFIG_PARITY_EVEN;
+          }
+          ESP_LOGD("modbus_parity", "Changing parity from %i to %i", id(modbus_uart).get_parity(), new_parity);
+          if (id(modbus_uart).get_parity() != new_parity) {
+            id(modbus_uart).flush();
+            id(modbus_uart).set_parity(new_parity);
+            id(modbus_uart).load_settings();
+          }
+
+  - id: modbus_stop_bits
+    name: "[Modbus Holding 112] Stop Bits"
+    platform: template
+    options:
+      - "0"
+      - "1"
+      - "2"
+    initial_option: "2"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          uint32_t new_stop_bits = stoi(x);
+          ESP_LOGD("modbus_stop_bits", "Changing baud rate from %i to %i",id(modbus_uart).get_stop_bits(), new_stop_bits);
+          if (id(modbus_uart).get_stop_bits() != new_stop_bits) {
+            id(modbus_uart).flush();
+            id(modbus_uart).set_stop_bits(new_stop_bits);
+            id(modbus_uart).load_settings();
+          }
 
 binary_sensor:
   - platform: template
@@ -159,6 +242,11 @@ sensor:
       return id(haier_ac).target_temperature;
     unit_of_measurement: "°C"
     accuracy_decimals: 1
+
+  - platform: uptime
+    id: uptime_sensor
+    name: Uptime
+    type: seconds
 
 text_sensor:
   - platform: template
@@ -264,6 +352,45 @@ modbus_controller:
       - address: 10
         value_type: COIL
         read_lambda: return id(haier_ac).valid_connection();
+
+      # Coil 92: Show fan as range
+      - address: 92
+        value_type: COIL
+        read_lambda: |-
+          return id(modbus_show_fan_as_range).state;
+        write_lambda: |-
+          if (x) {
+            id(modbus_show_fan_as_range).turn_on();
+          } else {
+            id(modbus_show_fan_as_range).turn_off();
+          }
+          return true;
+
+      # Coil 93: Show vanes as range
+      - address: 93
+        value_type: COIL
+        read_lambda: |-
+          return id(modbus_show_vanes_as_range).state;
+        write_lambda: |-
+          if (x) {
+            id(modbus_show_vanes_as_range).turn_on();
+          } else {
+            id(modbus_show_vanes_as_range).turn_off();
+          }
+          return true;
+
+      # Coil 94: Show thermostat as range
+      - address: 94
+        value_type: COIL
+        read_lambda: |-
+          return id(modbus_show_thermostat_state_as_range).state;
+        write_lambda: |-
+          if (x) {
+            id(modbus_show_thermostat_state_as_range).turn_on();
+          } else {
+            id(modbus_show_thermostat_state_as_range).turn_off();
+          }
+          return true;
 
       # Coil 95: Show modes as range
       - address: 95
@@ -377,7 +504,7 @@ modbus_controller:
             default: return 0;
           }
         write_lambda: |-
-          switch ((int)x) {
+          switch (x) {
             case 0: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform(); return true;
             case 1: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_LOW).perform(); return true;
             case 2: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_MEDIUM).perform(); return true;
@@ -403,7 +530,7 @@ modbus_controller:
             default: return 0;
           }
         write_lambda: |-
-          switch ((int)x) {
+          switch (x) {
             case 0: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform(); return true;
             case 1: id(haier_ac).make_call().set_preset(CLIMATE_PRESET_COMFORT).perform(); return true;
             case 2: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_LOW).perform(); return true;
@@ -435,7 +562,7 @@ modbus_controller:
             default: return 0;
           }
         write_lambda: |-
-          switch ((int)x) {
+          switch (x) {
             case 0: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_OFF).perform(); return true;
             case 1: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_BOTH).perform(); return true;
             case 2: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_HORIZONTAL).perform(); return true;
@@ -453,4 +580,47 @@ modbus_controller:
           id(modbus_temperature_correction_number).make_call().set_value(temp).perform();
           return true;
 
-# TODO continue
+      # Holding 104 - Uptime
+      - address: 104
+        value_type: U_WORD
+        read_lambda: |-
+          return (int)id(uptime_sensor).state;
+
+      # Holding 110 - Baud rate
+      - address: 110
+        value_type: U_WORD
+        read_lambda: |-
+          return stoi(id(modbus_baud_rate).state) / 100;
+        write_lambda: |-
+          std::string baud_rate = std::to_string(x * 100);
+          id(modbus_baud_rate).make_call().set_option(baud_rate).perform();
+          return true;
+
+      # Holding 111 - Parity Bit
+      - address: 111
+        value_type: U_WORD
+        read_lambda: |-
+          std::string parity_bit = id(modbus_parity_bit).state;
+          if (parity_bit == "Odd") {
+            return 1;
+          } else if (parity_bit == "Even") {
+            return 2;
+          } 
+          return 0;
+        write_lambda: |-
+          switch (x) {
+            case 0: id(modbus_parity_bit).make_call().set_option("None").perform(); return true;
+            case 1: id(modbus_parity_bit).make_call().set_option("Odd").perform(); return true;
+            case 2: id(modbus_parity_bit).make_call().set_option("Even").perform(); return true;
+            default: return false;
+          }
+
+      # Holding 112 - Stop Bits
+      - address: 112
+        value_type: U_WORD
+        read_lambda: |-
+          return stoi(id(modbus_stop_bits).state);
+        write_lambda: |-
+          std::string stop_bits = std::to_string(x);
+          id(modbus_stop_bits).make_call().set_option(stop_bits).perform();
+          return true;
