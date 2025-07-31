@@ -34,166 +34,35 @@ web_server:
 captive_portal:
 
 
+# UART configuration
 uart:
+  # UART for Haier air conditioner communication
   - id: haier_uart
     baud_rate: 9600
     tx_pin: 19
     rx_pin: 18
-    # tx_pin: 17
-    # rx_pin: 16    
-  - id: uart_modbus_server
+  
+  # UART for Modbus server communication
+  - id: modbus_uart
     baud_rate: 9600
     tx_pin: 17
-    rx_pin: 16    
+    rx_pin: 16
 
+# Modbus server configuration
 modbus:
-  - uart_id: uart_modbus_server
+  - uart_id: modbus_uart
     id: modbus_server
     role: server
 
-modbus_controller:
-  - modbus_id: modbus_server
-    address: 0x1F
-    # server_coil_registers:
-    #   - address: 1
-    #     read_lambda: |-
-    #       ESP_LOGI("modbus_server", "0x0001 READ");
-    #       return 1;
-    #     write_lambda: |-
-    #       ESP_LOGI("modbus_server", "0x0001 WRITE");
-    #       return 1;
-    server_registers:
-      - address: 0x0001
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0001 READ");
-          return 1;
-        write_lambda: |-
-          ESP_LOGI("modbus_server", "0x0001 WRITE");
-          return 1;
-      - address: 0x0002 # Screen light" TODO: change to COIL
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0002 READ -> %d", id(haier_display_switch).state ? 1 : 0);
-          return id(haier_display_switch).state ? 1 : 0;
-        write_lambda: |-
-          ESP_LOGI("modbus_server", "0x0002 WRITE <- %d", x);
-          if (x != 0) {
-            id(haier_display_switch).turn_on2();
-          } else {
-            id(haier_display_switch).turn_off();
-          }
-          return x;
-      - address: 0x0003
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0003 READ");
-          return 1;
-      - address: 0x0004
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0004 READ");
-          return 1;
-      - address: 0x0005
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0005 READ");
-          return 1;
-      - address: 0x0006
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0006 READ");
-          return 1;
-      - address: 0x0007
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0007 READ");
-          return 1;
-      - address: 0x0008
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0008 READ");
-          return 1;
-      - address: 0x0009
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0009 READ");
-          return 1;
-      - address: 0x000A
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x000A READ");
-          return 1;
-      - address: 0x000B
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x000B READ");
-          return 1;
-      - address: 0x0014
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0014 READ");
-          return 1;
-      - address: 0x0015
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0015 READ");
-          return 1;
-      - address: 0x0080
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x0080 READ");
-          return 1;
-      - address: 0x00C9
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x00C9 READ");
-          return 1;
-      - address: 0x00FA
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x00FA READ");
-          return 1;
-      - address: 0x00FB
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x00FB READ");
-          return 1;
-      - address: 0x00FC
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x00FC READ");
-          return 1;
-      - address: 0x00FD
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x00FD READ");
-          return 1;
-      - address: 0x00FE
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x00FE READ");
-          return 1;
-      - address: 0x00FF
-        value_type: U_WORD
-        read_lambda: |-
-          ESP_LOGI("modbus_server", "0x00FF READ");
-          return 1;
-
-
-
+# Haier climate component
 climate:
   - platform: haier
     id: haier_ac
-    protocol: smartAir2
-    name: Haier SmartAir2 Climate
+    name: "Haier Air Conditioner"
     uart_id: haier_uart
-    alternative_swing_control: false
+    protocol: SMARTAIR2
     wifi_signal: true
-    visual:
-      min_temperature: 16 °C
-      max_temperature: 30 °C
-      temperature_step: 1 °C
+    display: true
     supported_modes:
       - 'OFF'
       - HEAT_COOL
@@ -206,33 +75,382 @@ climate:
       - VERTICAL
       - HORIZONTAL
       - BOTH
-    supported_presets:
+    supported_presets: # TODO CLIMATE_PRESET_AWAY
       - BOOST
       - COMFORT
-      - AWAY
 
+# Switches for additional Haier features
 switch:
-  - platform: haier
-    health_mode:
-      name: Haier health mode
-    display:
-      id: haier_display_switch
-      name: Haier display
-  # - platform: template
-  #   name: "${friendly_name} Comfort Mode"
-  #   id: comfort_preset
-  #   icon: "mdi:weather-night"
-  #   lambda: |-
-  #     if (id(haier_ac).preset.has_value()) {
-  #       return id(haier_ac).preset.value() == climate::CLIMATE_PRESET_COMFORT;
-  #     }
-  #     return false;
-  #   turn_on_action:
-  #     - climate.set_preset:
-  #         id: haier_ac
-  #         preset: COMFORT
-  #   turn_off_action:
-  #     - climate.set_preset:
-  #         id: haier_ac
-  #         preset: NONE      
+  - platform: template
+    id: haier_ac_health_mode
+    name: Health mode
+    icon: mdi:leaf
+    restore_mode: RESTORE_DEFAULT_ON
+    lambda: |-
+      return id(haier_ac).get_health_mode();
+    turn_on_action:
+      climate.haier.health_on: haier_ac
+    turn_off_action:
+      climate.haier.health_off: haier_ac
 
+  - platform: template
+    id: haier_display_switch
+    name: "Display"
+    icon: mdi:led-on
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_ON
+    lambda: |-
+      return id(haier_ac).get_display_state();
+    turn_on_action:
+      - climate.haier.display_on: haier_ac
+    turn_off_action:
+      - climate.haier.display_off: haier_ac
+
+  # Used to store Modbus register value:
+  - platform: template
+    id: modbus_show_modes_as_range
+    name: "[Modbus Coil 95] Show modes as range"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+
+  - platform: template
+    id: modbus_show_fan_as_range
+    name: "[Modbus Coil 92] Show fan as range"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+
+binary_sensor:
+  - platform: template
+    id: haier_connected_sensor
+    name: "AC Connected"
+    icon: mdi:led-on
+    lambda: |-
+      return id(haier_ac).valid_connection();
+
+number:
+  # Used to store Modbus register value:
+  - platform: template
+    id: modbus_temperature_correction_number
+    name: "Temperature Correction for Modbus"
+    min_value: -10
+    max_value: 10
+    initial_value: 0.0
+    step: 0.1
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: "°C"
+
+# Status LED
+status_led:
+  pin: GPIO2
+
+# Additional sensors for monitoring
+sensor:
+  - platform: template
+    name: "Current Temperature"
+    lambda: |-
+      return id(haier_ac).current_temperature;
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "Target Temperature"
+    lambda: |-
+      return id(haier_ac).target_temperature;
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+text_sensor:
+  - platform: template
+    name: "Mode"
+    lambda: |-
+      auto mode = id(haier_ac).mode;
+      switch (mode) {
+        case CLIMATE_MODE_OFF: return std::string("Off");
+        case CLIMATE_MODE_HEAT: return std::string("Heat");
+        case CLIMATE_MODE_COOL: return std::string("Cool");
+        case CLIMATE_MODE_HEAT_COOL: return std::string("Auto");
+        case CLIMATE_MODE_DRY: return std::string("Dry");
+        case CLIMATE_MODE_FAN_ONLY: return std::string("Fan");
+        default: return std::string("Unknown");
+      }
+
+  - platform: template
+    name: "Action TODO" # TODO
+    lambda: |-
+      auto action = id(haier_ac).action;
+      switch (action) {
+        case CLIMATE_ACTION_OFF: return std::string("Off");
+        case CLIMATE_ACTION_COOLING: return std::string("Cooling");
+        case CLIMATE_ACTION_HEATING: return std::string("Heating");
+        case CLIMATE_ACTION_IDLE: return std::string("Idle");
+        case CLIMATE_ACTION_DRYING: return std::string("Drying");
+        case CLIMATE_ACTION_FAN: return std::string("Fan");
+        default: return std::string("Unknown");
+      } 
+
+# Modbus controller with server registers based on ONOKOM-AIR-HR-1-MB-B specification
+modbus_controller:
+  - modbus_id: modbus_server
+    address: 0x1F  # Modbus device address
+    server_registers:
+      # Coil registers:
+
+      # Coil 1: Active
+      - address: 1
+        value_type: COIL
+        read_lambda: |-
+          return id(haier_ac).mode != CLIMATE_MODE_OFF;
+        write_lambda: |-
+          if (x) {
+            id(haier_ac).send_power_on_command();
+          } else {
+            id(haier_ac).send_power_off_command();
+          }
+          return true;
+
+      # Coil 2: Screen light
+      - address: 2
+        value_type: COIL
+        read_lambda: |-
+          return id(haier_display_switch).state;
+        write_lambda: |-
+          if (x) {
+            id(haier_display_switch).turn_on();
+          } else {
+            id(haier_display_switch).turn_off();
+          }
+          return true;
+
+      # Coil 4: Quiet mode
+      - address: 3
+        value_type: COIL
+        read_lambda: |-
+          return id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_COMFORT;
+        write_lambda: |-
+          id(haier_ac).make_call().set_preset(CLIMATE_PRESET_COMFORT).perform();
+          return true;
+
+      # Coil 5: Beeper (Not supported in SMARTAIR2)
+      - address: 5
+        value_type: COIL
+        read_lambda: return 0;
+
+      # Coil 7: Turbo mode
+      - address: 7
+        value_type: COIL
+        read_lambda: |-
+          return id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST;
+        write_lambda: |-
+          id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();
+          return true;
+
+      # Coil 8: Sleep mode (Not supported in SMARTAIR2)
+      - address: 8
+        value_type: COIL
+        read_lambda: return 0;
+
+      # Coil 9: Ionization (Not supported in SMARTAIR2)
+      - address: 9
+        value_type: COIL
+        read_lambda: return 0;
+
+      # Coil 10: Self cleaning (Not supported in SMARTAIR2)
+      - address: 10
+        value_type: COIL
+        read_lambda: return 0;
+
+      # Coil 20: AC connected
+      - address: 10
+        value_type: COIL
+        read_lambda: return id(haier_ac).valid_connection();
+
+      # Coil 95: Show modes as range
+      - address: 95
+        value_type: COIL
+        read_lambda: |-
+          return id(modbus_show_modes_as_range).state;
+        write_lambda: |-
+          if (x) {
+            id(modbus_show_modes_as_range).turn_on();
+          } else {
+            id(modbus_show_modes_as_range).turn_off();
+          }
+          return true;
+
+      # Holding registers:
+      
+      # Holding 1 - Mode
+      - address: 1
+        value_type: U_WORD
+        read_lambda: |-
+          switch (id(haier_ac).mode) {
+            case CLIMATE_MODE_HEAT: return 1;
+            case CLIMATE_MODE_COOL: return 2;
+            case CLIMATE_MODE_HEAT_COOL: return 3;
+            case CLIMATE_MODE_DRY: return 4;
+            case CLIMATE_MODE_FAN_ONLY: return 5;
+            default: return 0;
+          }
+        write_lambda: |-
+          switch (x) {
+            case 1: id(haier_ac).make_call().set_mode(CLIMATE_MODE_HEAT).perform(); return true;
+            case 2: id(haier_ac).make_call().set_mode(CLIMATE_MODE_COOL).perform(); return true;
+            case 3: id(haier_ac).make_call().set_mode(CLIMATE_MODE_HEAT_COOL).perform(); return true;
+            case 4: id(haier_ac).make_call().set_mode(CLIMATE_MODE_DRY).perform(); return true;
+            case 5: id(haier_ac).make_call().set_mode(CLIMATE_MODE_FAN_ONLY).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 2 - Active mode
+      - address: 2
+        value_type: U_WORD
+        read_lambda: |-
+          switch (id(haier_ac).mode) {
+            case CLIMATE_MODE_OFF: return 0;
+            case CLIMATE_MODE_HEAT: return 1;
+            case CLIMATE_MODE_COOL: return 2;
+            case CLIMATE_MODE_HEAT_COOL: return 3;
+            case CLIMATE_MODE_DRY: return 4;
+            case CLIMATE_MODE_FAN_ONLY: return 5;
+            default: return 0;
+          }
+        write_lambda: |-
+          switch (x) {
+            case 0: id(haier_ac).make_call().set_mode(CLIMATE_MODE_OFF).perform(); return true;
+            case 1: id(haier_ac).make_call().set_mode(CLIMATE_MODE_HEAT).perform(); return true;
+            case 2: id(haier_ac).make_call().set_mode(CLIMATE_MODE_COOL).perform(); return true;
+            case 3: id(haier_ac).make_call().set_mode(CLIMATE_MODE_HEAT_COOL).perform(); return true;
+            case 4: id(haier_ac).make_call().set_mode(CLIMATE_MODE_DRY).perform(); return true;
+            case 5: id(haier_ac).make_call().set_mode(CLIMATE_MODE_FAN_ONLY).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 3 - Indoor air temperature
+      - address: 3
+        value_type: S_WORD
+        read_lambda: |-
+          float temp = id(haier_ac).current_temperature;
+          float correction = id(modbus_temperature_correction_number).state;
+          return (temp + correction) * 100; // Scale to 0.01 degree resolution
+
+      # Holding 4 - Outdoor air temperature (Not supported in SMARTAIR2)
+      - address: 4
+        value_type: S_WORD
+        read_lambda: |-
+          return -32768;
+
+      # Holding 5 - Target temperature
+      - address: 5
+        value_type: S_WORD
+        read_lambda: |-
+          float temp = id(haier_ac).target_temperature;
+          float correction = id(modbus_temperature_correction_number).state;
+          return (temp + correction) * 100;  // Scale to 0.01 degree resolution
+        write_lambda: |-
+          float correction = id(modbus_temperature_correction_number).state;
+          float temp = ((float)x) / 100.0;  // Convert from 0.01 scale
+          
+          id(haier_ac).make_call().set_target_temperature(temp - correction).perform();
+          return true;
+
+      # Holding 6 - Thermostat state (TODO)
+      - address: 0x0106
+        value_type: U_WORD
+        read_lambda: |-
+          auto action = id(haier_ac).action;
+          switch (action) {
+            case CLIMATE_ACTION_HEATING: return 1;
+            case CLIMATE_ACTION_COOLING: return 2;
+            default: return 0;  // Idle
+          }
+
+      # Holding 7 - Fan speed
+      - address: 7
+        value_type: U_WORD
+        read_lambda: |-
+          switch (id(haier_ac).fan_mode.value_or(CLIMATE_FAN_AUTO)) {
+            case CLIMATE_FAN_AUTO: return 0;
+            case CLIMATE_FAN_LOW: return 1;
+            case CLIMATE_FAN_MEDIUM: return 2;
+            case CLIMATE_FAN_HIGH: return 3;
+            default: return 0;
+          }
+        write_lambda: |-
+          switch ((int)x) {
+            case 0: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform(); return true;
+            case 1: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_LOW).perform(); return true;
+            case 2: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_MEDIUM).perform(); return true;
+            case 3: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_HIGH).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 8 - Smart fan speed
+      - address: 8
+        value_type: U_WORD
+        read_lambda: |-
+          if(id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_COMFORT) {
+            return 1;
+          }          
+          if(id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST) {
+            return 5;
+          }
+          switch (id(haier_ac).fan_mode.value_or(CLIMATE_FAN_AUTO)) {
+            case CLIMATE_FAN_AUTO: return 0;
+            case CLIMATE_FAN_LOW: return 2;
+            case CLIMATE_FAN_MEDIUM: return 3;
+            case CLIMATE_FAN_HIGH: return 4;
+            default: return 0;
+          }
+        write_lambda: |-
+          switch ((int)x) {
+            case 0: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform(); return true;
+            case 1: id(haier_ac).make_call().set_preset(CLIMATE_PRESET_COMFORT).perform(); return true;
+            case 2: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_LOW).perform(); return true;
+            case 3: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_MEDIUM).perform(); return true;
+            case 4: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_HIGH).perform(); return true;
+            case 5: id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 9 - Horizontal vanes (Not supported in haier-esphome) TODO
+      - address: 9
+        value_type: U_WORD
+        read_lambda: return 0;
+
+      # Holding 10 - Vertical vanes (Not supported in haier-esphome) TODO
+      - address: 10
+        value_type: U_WORD
+        read_lambda: return 0;
+
+      # Holding 11 - Vanes swing TODO alternative_swing_control
+      - address: 11
+        value_type: U_WORD
+        read_lambda: |-
+          switch (id(haier_ac).swing_mode) {
+            case CLIMATE_SWING_OFF: return 0;
+            case CLIMATE_SWING_BOTH: return 1;
+            case CLIMATE_SWING_HORIZONTAL: return 2;
+            case CLIMATE_SWING_VERTICAL: return 3;
+            default: return 0;
+          }
+        write_lambda: |-
+          switch ((int)x) {
+            case 0: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_OFF).perform(); return true;
+            case 1: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_BOTH).perform(); return true;
+            case 2: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_HORIZONTAL).perform(); return true;
+            case 3: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_VERTICAL).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 14 - Temperature correction
+      - address: 14
+        value_type: S_WORD
+        read_lambda: |-
+          return id(modbus_temperature_correction_number).state * 100;  // Scale to 0.01 degree resolution
+        write_lambda: |-
+          float temp = ((float)x) / 100.0;  // Convert from 0.01 scale
+          id(modbus_temperature_correction_number).make_call().set_value(temp).perform();
+          return true;
+
+# TODO continue

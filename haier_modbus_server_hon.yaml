@@ -1,0 +1,413 @@
+esphome:
+  name: haier-modbus-server-hon
+  friendly_name: "Haier AC Modbus Server (HON Protocol)"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "i9F3/CGTQ1FtxwJ5FHP8fE5QOUY/DP8n+KeG1iM4dYw="
+
+ota:
+  - platform: esphome
+    password: "YOUR_OTA_PASSWORD_HERE"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Haier-HON-Modbus Fallback"
+    password: "12345678"
+
+web_server:
+  port: 80
+
+# External components for haier-esphome
+external_components:
+  - source: 
+      type: local
+      path: ../src/haier-esphome/components
+    components: [ haier ]
+
+# UART configuration
+uart:
+  # UART for Haier air conditioner communication
+  - id: haier_uart
+    baud_rate: 9600
+    tx_pin: GPIO17
+    rx_pin: GPIO16
+  
+  # UART for Modbus server communication
+  - id: modbus_uart
+    baud_rate: 9600
+    tx_pin: GPIO18
+    rx_pin: GPIO19
+
+# Modbus server configuration
+modbus:
+  - uart_id: modbus_uart
+    id: modbus_server
+    role: server
+
+# Haier climate component (HON protocol)
+climate:
+  - platform: haier
+    id: haier_ac
+    name: "Haier Air Conditioner (HON)"
+    uart_id: haier_uart
+    protocol: HON
+    wifi_signal: true
+    display: true
+    control_method: SET_GROUP_PARAMETERS
+    supported_modes:
+      - 'OFF'
+      - HEAT_COOL
+      - COOL
+      - HEAT
+      - DRY
+      - FAN_ONLY
+    supported_swing_modes:
+      - 'OFF'
+      - VERTICAL
+      - HORIZONTAL
+      - BOTH
+    supported_presets:
+      - BOOST
+      - SLEEP
+    on_alarm_start:
+      then:
+        - logger.log: "Haier alarm started"
+    on_alarm_end:
+      then:
+        - logger.log: "Haier alarm ended"
+
+# Switches for additional Haier features (HON protocol)
+switch:
+  - platform: template
+    id: haier_display_switch
+    name: "Haier Display"
+    icon: mdi:led-on
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_ON
+    lambda: |-
+      return id(haier_ac).get_display_state();
+    turn_on_action:
+      - climate.haier.display_on: haier_ac
+    turn_off_action:
+      - climate.haier.display_off: haier_ac
+
+  - platform: template
+    id: haier_health_switch
+    name: "Haier Health Mode"
+    icon: mdi:leaf
+    restore_mode: RESTORE_DEFAULT_OFF
+    lambda: |-
+      return id(haier_ac).get_health_mode();
+    turn_on_action:
+      - climate.haier.health_on: haier_ac
+    turn_off_action:
+      - climate.haier.health_off: haier_ac
+
+  - platform: template
+    id: haier_beeper_switch
+    name: "Haier Beeper"
+    icon: mdi:volume-high
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_ON
+    optimistic: true
+    turn_on_action:
+      - climate.haier.beeper_on: haier_ac
+    turn_off_action:
+      - climate.haier.beeper_off: haier_ac
+
+# Buttons for self-cleaning functions (HON only)
+button:
+  - platform: template
+    name: "Start Self Cleaning"
+    icon: mdi:wash
+    on_press:
+      - climate.haier.start_self_cleaning: haier_ac
+
+# Modbus controller with enhanced registers for HON protocol
+modbus_controller:
+  - modbus_id: modbus_server
+    address: 0x1F  # Modbus device address
+    server_registers:
+      # Coil registers
+      
+      # Address 0x0001 - Active (coil 1)
+      - address: 0x0001
+        value_type: U_WORD
+        read_lambda: |-
+          auto mode = id(haier_ac).mode;
+          return (mode != CLIMATE_MODE_OFF) ? 1 : 0;
+        write_lambda: |-
+          if (x != 0) {
+            if (id(haier_ac).mode == CLIMATE_MODE_OFF) {
+              auto call = id(haier_ac).make_call();
+              call.set_mode(CLIMATE_MODE_AUTO);
+              call.perform();
+            }
+          } else {
+            auto call = id(haier_ac).make_call();
+            call.set_mode(CLIMATE_MODE_OFF);
+            call.perform();
+          }
+          return true;
+
+      # Address 0x0002 - Screen light (coil 2)  
+      - address: 0x0002
+        value_type: U_WORD
+        read_lambda: |-
+          return id(haier_display_switch).state ? 1 : 0;
+        write_lambda: |-
+          if (x != 0) {
+            id(haier_display_switch).turn_on();
+          } else {
+            id(haier_display_switch).turn_off();
+          }
+          return true;
+
+      # Address 0x0005 - Beeper (coil 5) - HON protocol support
+      - address: 0x0005
+        value_type: U_WORD
+        read_lambda: |-
+          return id(haier_beeper_switch).state ? 1 : 0;
+        write_lambda: |-
+          if (x != 0) {
+            id(haier_beeper_switch).turn_on();
+          } else {
+            id(haier_beeper_switch).turn_off();
+          }
+          return true;
+
+      # Health mode coil (custom register)
+      - address: 0x0006
+        value_type: U_WORD
+        read_lambda: |-
+          return id(haier_health_switch).state ? 1 : 0;
+        write_lambda: |-
+          if (x != 0) {
+            id(haier_health_switch).turn_on();
+          } else {
+            id(haier_health_switch).turn_off();
+          }
+          return true;
+
+      # Holding registers (same as SMARTAIR2 version)
+      
+      # Address 0x0001 - Mode (holding register 1)
+      - address: 0x0101
+        value_type: U_WORD
+        read_lambda: |-
+          auto mode = id(haier_ac).mode;
+          switch (mode) {
+            case CLIMATE_MODE_HEAT: return 1;
+            case CLIMATE_MODE_COOL: return 2;
+            case CLIMATE_MODE_HEAT_COOL: return 3;
+            case CLIMATE_MODE_DRY: return 4;
+            case CLIMATE_MODE_FAN_ONLY: return 5;
+            default: return 1;
+          }
+        write_lambda: |-
+          auto call = id(haier_ac).make_call();
+          switch ((int)x) {
+            case 1: call.set_mode(CLIMATE_MODE_HEAT); break;
+            case 2: call.set_mode(CLIMATE_MODE_COOL); break;
+            case 3: call.set_mode(CLIMATE_MODE_HEAT_COOL); break;
+            case 4: call.set_mode(CLIMATE_MODE_DRY); break;
+            case 5: call.set_mode(CLIMATE_MODE_FAN_ONLY); break;
+            default: call.set_mode(CLIMATE_MODE_AUTO); break;
+          }
+          call.perform();
+          return true;
+
+      # Address 0x0002 - Active mode (holding register 2)
+      - address: 0x0102
+        value_type: U_WORD
+        read_lambda: |-
+          auto mode = id(haier_ac).mode;
+          switch (mode) {
+            case CLIMATE_MODE_OFF: return 0;
+            case CLIMATE_MODE_HEAT: return 1;
+            case CLIMATE_MODE_COOL: return 2;
+            case CLIMATE_MODE_HEAT_COOL: return 3;
+            case CLIMATE_MODE_DRY: return 4;
+            case CLIMATE_MODE_FAN_ONLY: return 5;
+            default: return 0;
+          }
+
+      # Address 0x0003 - Indoor air temperature (holding register 3)
+      - address: 0x0103
+        value_type: S_WORD
+        read_lambda: |-
+          float temp = id(haier_ac).current_temperature;
+          return (int16_t)(temp * 100);
+
+      # Address 0x0005 - Target temperature (holding register 5)
+      - address: 0x0105
+        value_type: S_WORD
+        read_lambda: |-
+          float temp = id(haier_ac).target_temperature;
+          return (int16_t)(temp * 100);
+        write_lambda: |-
+          float temp = (float)x / 100.0;
+          if (temp >= 16.0 && temp <= 32.0) {
+            auto call = id(haier_ac).make_call();
+            call.set_target_temperature(temp);
+            call.perform();
+            return true;
+          }
+          return false;
+
+      # Address 0x0006 - Thermostat state (holding register 6)
+      - address: 0x0106
+        value_type: U_WORD
+        read_lambda: |-
+          auto action = id(haier_ac).action;
+          switch (action) {
+            case CLIMATE_ACTION_HEATING: return 1;
+            case CLIMATE_ACTION_COOLING: return 2;
+            default: return 0;
+          }
+
+      # Address 0x0007 - Fan speed (holding register 7)
+      - address: 0x0107
+        value_type: U_WORD
+        read_lambda: |-
+          auto fan = id(haier_ac).fan_mode;
+          switch (fan.value_or(CLIMATE_FAN_AUTO)) {
+            case CLIMATE_FAN_AUTO: return 0;
+            case CLIMATE_FAN_LOW: return 1;
+            case CLIMATE_FAN_MEDIUM: return 2;
+            case CLIMATE_FAN_HIGH: return 3;
+            default: return 0;
+          }
+        write_lambda: |-
+          auto call = id(haier_ac).make_call();
+          switch ((int)x) {
+            case 0: call.set_fan_mode(CLIMATE_FAN_AUTO); break;
+            case 1: call.set_fan_mode(CLIMATE_FAN_LOW); break;
+            case 2: call.set_fan_mode(CLIMATE_FAN_MEDIUM); break;
+            case 3: call.set_fan_mode(CLIMATE_FAN_HIGH); break;
+            default: call.set_fan_mode(CLIMATE_FAN_AUTO); break;
+          }
+          call.perform();
+          return true;
+
+      # Address 0x0009 - Horizontal vanes (holding register 9)
+      - address: 0x0109
+        value_type: U_WORD
+        read_lambda: |-
+          auto swing = id(haier_ac).swing_mode;
+          if (swing == CLIMATE_SWING_HORIZONTAL || swing == CLIMATE_SWING_BOTH) {
+            return 1;
+          } else {
+            return 4;
+          }
+        write_lambda: |-
+          auto call = id(haier_ac).make_call();
+          if ((int)x == 1) {
+            auto current_swing = id(haier_ac).swing_mode;
+            if (current_swing == CLIMATE_SWING_VERTICAL) {
+              call.set_swing_mode(CLIMATE_SWING_BOTH);
+            } else {
+              call.set_swing_mode(CLIMATE_SWING_HORIZONTAL);
+            }
+          } else {
+            auto current_swing = id(haier_ac).swing_mode;
+            if (current_swing == CLIMATE_SWING_BOTH) {
+              call.set_swing_mode(CLIMATE_SWING_VERTICAL);
+            } else if (current_swing == CLIMATE_SWING_HORIZONTAL) {
+              call.set_swing_mode(CLIMATE_SWING_OFF);
+            }
+          }
+          call.perform();
+          return true;
+
+      # Address 0x000A - Vertical vanes (holding register 10)
+      - address: 0x010A
+        value_type: U_WORD
+        read_lambda: |-
+          auto swing = id(haier_ac).swing_mode;
+          if (swing == CLIMATE_SWING_VERTICAL || swing == CLIMATE_SWING_BOTH) {
+            return 1;
+          } else {
+            return 0;
+          }
+        write_lambda: |-
+          auto call = id(haier_ac).make_call();
+          if ((int)x == 1) {
+            auto current_swing = id(haier_ac).swing_mode;
+            if (current_swing == CLIMATE_SWING_HORIZONTAL) {
+              call.set_swing_mode(CLIMATE_SWING_BOTH);
+            } else {
+              call.set_swing_mode(CLIMATE_SWING_VERTICAL);
+            }
+          } else {
+            auto current_swing = id(haier_ac).swing_mode;
+            if (current_swing == CLIMATE_SWING_BOTH) {
+              call.set_swing_mode(CLIMATE_SWING_HORIZONTAL);
+            } else if (current_swing == CLIMATE_SWING_VERTICAL) {
+              call.set_swing_mode(CLIMATE_SWING_OFF);
+            }
+          }
+          call.perform();
+          return true;
+
+# Status LED
+status_led:
+  pin: GPIO2
+
+# Additional sensors for monitoring
+sensor:
+  - platform: template
+    name: "Haier Current Temperature"
+    lambda: |-
+      return id(haier_ac).current_temperature;
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    
+  - platform: template
+    name: "Haier Target Temperature"  
+    lambda: |-
+      return id(haier_ac).target_temperature;
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+
+text_sensor:
+  - platform: template
+    name: "Haier Mode"
+    lambda: |-
+      auto mode = id(haier_ac).mode;
+      switch (mode) {
+        case CLIMATE_MODE_OFF: return std::string("Off");
+        case CLIMATE_MODE_HEAT: return std::string("Heat");
+        case CLIMATE_MODE_COOL: return std::string("Cool");
+        case CLIMATE_MODE_HEAT_COOL: return std::string("Auto");
+        case CLIMATE_MODE_DRY: return std::string("Dry");
+        case CLIMATE_MODE_FAN_ONLY: return std::string("Fan");
+        default: return std::string("Unknown");
+      }
+
+  - platform: template
+    name: "Haier Action"
+    lambda: |-
+      auto action = id(haier_ac).action;
+      switch (action) {
+        case CLIMATE_ACTION_OFF: return std::string("Off");
+        case CLIMATE_ACTION_COOLING: return std::string("Cooling");
+        case CLIMATE_ACTION_HEATING: return std::string("Heating");
+        case CLIMATE_ACTION_IDLE: return std::string("Idle");
+        case CLIMATE_ACTION_DRYING: return std::string("Drying");
+        case CLIMATE_ACTION_FAN: return std::string("Fan");
+        default: return std::string("Unknown");
+      } 
