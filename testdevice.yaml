@@ -1,6 +1,37 @@
 esphome:
   name: testdevice
   friendly_name: TestDevice
+  on_boot:
+    priority: -100  # Run after all components are initialized
+    then:
+      - lambda: |-
+          // Apply the restored modbus address
+          int address = id(modbus_address_number).state;
+          ESP_LOGI("boot", "Setting Modbus address to: %d", address);
+          id(modbus_controller_server).set_address(address);
+          
+          // Apply restored alternative swing control setting
+          bool alt_swing = id(alternative_swing_control).state;
+          ESP_LOGI("boot", "Setting alternative swing control to: %s", alt_swing ? "ON" : "OFF");
+          id(haier_ac).set_alternative_swing_control(alt_swing);
+
+          // Apply restored UART settings
+          uint32_t baud_rate = stoi(id(modbus_baud_rate).state);
+          UARTParityOptions parity = UART_CONFIG_PARITY_NONE;
+          if (id(modbus_parity_bit).state == "Odd") {
+            parity = UART_CONFIG_PARITY_ODD;
+          } else if (id(modbus_parity_bit).state == "Even") {
+            parity = UART_CONFIG_PARITY_EVEN;
+          }
+          uint32_t stop_bits = stoi(id(modbus_stop_bits).state);
+
+          ESP_LOGI("boot", "Applying UART configuration: baud=%d, parity=%d, stop_bits=%d", baud_rate, parity, stop_bits);
+          id(modbus_uart).flush();
+          id(modbus_uart).set_baud_rate(baud_rate);
+          id(modbus_uart).set_parity(parity);
+          id(modbus_uart).set_stop_bits(stop_bits);
+          id(modbus_uart).load_settings();
+          ESP_LOGI("boot", "UART configuration applied successfully");
 
 esp32:
   board: esp32dev
@@ -98,7 +129,6 @@ switch:
     id: haier_ac_health_mode
     name: "[Modbus 6] Health mode"
     icon: mdi:leaf
-    restore_mode: RESTORE_DEFAULT_ON
     lambda: |-
       return id(haier_ac).get_health_mode();
     turn_on_action:
@@ -111,7 +141,6 @@ switch:
     name: "[Modbus Coil 2] Screen light"
     icon: mdi:led-on
     entity_category: config
-    restore_mode: RESTORE_DEFAULT_ON
     lambda: |-
       return id(haier_ac).get_display_state();
     turn_on_action:
@@ -228,7 +257,7 @@ binary_sensor:
       return id(haier_ac).valid_connection();
 
 number:
-  # Used to store Modbus register value:
+  # Used to store Modbus register values:
   - platform: template
     id: modbus_temperature_correction_number
     name: "[Modbus Holding 14] Temperature Correction for Modbus"
@@ -251,9 +280,10 @@ number:
     optimistic: true
     set_action:
       - lambda: |-
-          ESP_LOGI("modbus_address", "Changing Modbus address to %d", x);
-          id(modbus_controller_server).set_address(x);
-          ESP_LOGI("modbus_address", "Modbus address successfully changed to %d", x);
+          int address = x;
+          ESP_LOGI("modbus_address", "Changing Modbus address to %d", address);
+          id(modbus_controller_server).set_address(address);
+          ESP_LOGI("modbus_address", "Modbus address successfully changed to %d", address);
 
 # Status LED
 status_led:
@@ -290,7 +320,7 @@ sensor:
 modbus_controller:
   - modbus_id: modbus_server
     id: modbus_controller_server
-    address: 0x1F  # Modbus device address
+    address: 1
     server_registers:
 
       # Coil 1: Active
