@@ -79,6 +79,17 @@ climate:
       - BOOST
       - COMFORT
 
+  # Supported by smartAir2 only:
+  - platform: template
+    id: alternative_swing_control
+    name: "Alternative swing control"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    turn_on_action:
+      - lambda: id(haier_ac).set_alternative_swing_control(true);
+    turn_off_action:
+      - lambda: id(haier_ac).set_alternative_swing_control(false);
+
 # Switches for additional Haier features
 switch:
   - platform: template
@@ -95,7 +106,7 @@ switch:
 
   - platform: template
     id: haier_display_switch
-    name: "[Coil 2] Screen light"
+    name: "[Modbus Coil 2] Screen light"
     icon: mdi:led-on
     entity_category: config
     restore_mode: RESTORE_DEFAULT_ON
@@ -557,7 +568,7 @@ modbus_controller:
         value_type: U_WORD
         read_lambda: return 0;
 
-      # Holding 11 - Vanes swing TODO alternative_swing_control
+      # Holding 11 - Vanes swing
       - address: 11
         value_type: U_WORD
         read_lambda: |-
