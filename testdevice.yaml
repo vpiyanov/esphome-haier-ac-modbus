@@ -83,7 +83,7 @@ climate:
 switch:
   - platform: template
     id: haier_ac_health_mode
-    name: Health mode
+    name: "[Modbus 6] Health mode"
     icon: mdi:leaf
     restore_mode: RESTORE_DEFAULT_ON
     lambda: |-
@@ -95,7 +95,7 @@ switch:
 
   - platform: template
     id: haier_display_switch
-    name: "Display"
+    name: "[Coil 2] Screen light"
     icon: mdi:led-on
     entity_category: config
     restore_mode: RESTORE_DEFAULT_ON
@@ -131,31 +131,10 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
 
-  - platform: restart
-    id: restart_switch
-    name: "Restart Device"
-
-# Buttons for Modbus address control
 button:
-  - platform: template
-    id: apply_modbus_address_button
-    name: "Apply Modbus Address"
-    on_press:
-      - lambda: |-
-          uint8_t address = (uint8_t)id(modbus_address_number).state;
-          ESP_LOGI("modbus_address", "Applying Modbus address: %d", address);
-          id(modbus_controller_server).set_address(address);
-
-  - platform: template
-    id: reset_modbus_address_button
-    name: "Reset Modbus Address to Default"
-    on_press:
-      - number.set:
-          id: modbus_address_number
-          value: 31  # 0x1F
-      - lambda: |-
-          ESP_LOGI("modbus_address", "Resetting Modbus address to default: 31");
-          id(modbus_controller_server).set_address(31);
+  - platform: restart
+    id: restart_button
+    name: "[Modbus Holding 120] Restart Device"
 
 select:
   - id: modbus_baud_rate
@@ -221,7 +200,7 @@ select:
     set_action:
       - lambda: |-
           uint32_t new_stop_bits = stoi(x);
-          ESP_LOGD("modbus_stop_bits", "Changing baud rate from %i to %i",id(modbus_uart).get_stop_bits(), new_stop_bits);
+          ESP_LOGD("modbus_stop_bits", "Changing stop bits from %i to %i",id(modbus_uart).get_stop_bits(), new_stop_bits);
           if (id(modbus_uart).get_stop_bits() != new_stop_bits) {
             id(modbus_uart).flush();
             id(modbus_uart).set_stop_bits(new_stop_bits);
@@ -231,8 +210,7 @@ select:
 binary_sensor:
   - platform: template
     id: haier_connected_sensor
-    name: "AC Connected"
-    icon: mdi:led-on
+    name: "[Modbus Coil 20] AC Connected"
     lambda: |-
       return id(haier_ac).valid_connection();
 
@@ -240,7 +218,7 @@ number:
   # Used to store Modbus register value:
   - platform: template
     id: modbus_temperature_correction_number
-    name: "Temperature Correction for Modbus"
+    name: "[Modbus Holding 14] Temperature Correction for Modbus"
     min_value: -10
     max_value: 10
     initial_value: 0.0
@@ -251,7 +229,7 @@ number:
 
   - platform: template
     id: modbus_address_number
-    name: "Modbus Address"
+    name: "[Modbus Holding 128] Modbus Address"
     min_value: 1
     max_value: 247
     initial_value: 1
@@ -272,19 +250,19 @@ status_led:
 sensor:
   - platform: internal_temperature
     id: mcu_temperature_sensor
-    name: "MCU Temperature"
+    name: "[Modbus Input 124] MCU Temperature"
     unit_of_measurement: "°C"
     accuracy_decimals: 1
 
   - platform: template
-    name: "Current Temperature"
+    name: "[Modbus Holding 3] Current Temperature"
     lambda: |-
       return id(haier_ac).current_temperature;
     unit_of_measurement: "°C"
     accuracy_decimals: 1
 
   - platform: template
-    name: "Target Temperature"
+    name: "[Modbus Holding 5] Target Temperature"
     lambda: |-
       return id(haier_ac).target_temperature;
     unit_of_measurement: "°C"
@@ -292,37 +270,8 @@ sensor:
 
   - platform: uptime
     id: uptime_sensor
-    name: Uptime
+    name: "[Modbus Holding 104] Uptime"
     type: seconds
-
-text_sensor:
-  - platform: template
-    name: "Mode"
-    lambda: |-
-      auto mode = id(haier_ac).mode;
-      switch (mode) {
-        case CLIMATE_MODE_OFF: return std::string("Off");
-        case CLIMATE_MODE_HEAT: return std::string("Heat");
-        case CLIMATE_MODE_COOL: return std::string("Cool");
-        case CLIMATE_MODE_HEAT_COOL: return std::string("Auto");
-        case CLIMATE_MODE_DRY: return std::string("Dry");
-        case CLIMATE_MODE_FAN_ONLY: return std::string("Fan");
-        default: return std::string("Unknown");
-      }
-
-  - platform: template
-    name: "Action TODO" # TODO
-    lambda: |-
-      auto action = id(haier_ac).action;
-      switch (action) {
-        case CLIMATE_ACTION_OFF: return std::string("Off");
-        case CLIMATE_ACTION_COOLING: return std::string("Cooling");
-        case CLIMATE_ACTION_HEATING: return std::string("Heating");
-        case CLIMATE_ACTION_IDLE: return std::string("Idle");
-        case CLIMATE_ACTION_DRYING: return std::string("Drying");
-        case CLIMATE_ACTION_FAN: return std::string("Fan");
-        default: return std::string("Unknown");
-      } 
 
 # Modbus controller with server registers based on ONOKOM-AIR-HR-1-MB-B specification
 modbus_controller:
@@ -330,7 +279,6 @@ modbus_controller:
     id: modbus_controller_server
     address: 0x1F  # Modbus device address
     server_registers:
-      # Coil registers:
 
       # Coil 1: Active
       - address: 1
@@ -371,6 +319,19 @@ modbus_controller:
       - address: 5
         value_type: COIL
         read_lambda: return 0;
+
+      # Coil 6: Eco
+      - address: 2
+        value_type: COIL
+        read_lambda: |-
+          return id(haier_ac_health_mode).state;
+        write_lambda: |-
+          if (x) {
+            id(haier_ac_health_mode).turn_on();
+          } else {
+            id(haier_ac_health_mode).turn_off();
+          }
+          return true;
 
       # Coil 7: Turbo mode
       - address: 7
@@ -453,8 +414,6 @@ modbus_controller:
           }
           return true;
 
-      # Holding registers:
-      
       # Holding 1 - Mode
       - address: 1
         value_type: U_WORD
@@ -681,7 +640,7 @@ modbus_controller:
         write_lambda: |-
           if (x == 1) {
             ESP_LOGW("modbus_reboot", "Reboot requested via Modbus register 120");
-            id(restart_switch).turn_on();
+            id(restart_button).press();
             return true;
           }
           return false;
@@ -719,8 +678,6 @@ modbus_controller:
         value_type: U_WORD
         read_lambda: return 0;
 
-      # Input registers:
-      
       # Input 124 - MCU Temperature
       - address: 124
         value_type: S_WORD
