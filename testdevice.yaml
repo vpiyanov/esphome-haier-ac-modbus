@@ -79,6 +79,10 @@ climate:
       - BOOST
       - COMFORT
 
+
+# Switches for additional Haier features
+switch:
+
   # Supported by smartAir2 only:
   - platform: template
     id: alternative_swing_control
@@ -90,8 +94,6 @@ climate:
     turn_off_action:
       - lambda: id(haier_ac).set_alternative_swing_control(false);
 
-# Switches for additional Haier features
-switch:
   - platform: template
     id: haier_ac_health_mode
     name: "[Modbus 6] Health mode"
