@@ -162,6 +162,12 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
 
+  - platform: template
+    id: modbus_allow_the_use_of_an_external_temperature_sensor
+    name: "[Modbus Coil 100] Allow the use of an external temperature sensor"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+
 button:
   - platform: restart
     id: restart_button
@@ -573,6 +579,22 @@ modbus_controller:
             id(modbus_show_modes_as_range).turn_on();
           } else {
             id(modbus_show_modes_as_range).turn_off();
+          }
+          return true;
+
+      # Coil 100: Allow the use of an external temperature sensor
+      - address: 100
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(modbus_allow_the_use_of_an_external_temperature_sensor).state;
+          ESP_LOGD("modbus_coil_100", "Read Allow the use of an external temperature sensor: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_100", "Write Allow the use of an external temperature sensor: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(modbus_allow_the_use_of_an_external_temperature_sensor).turn_on();
+          } else {
+            id(modbus_allow_the_use_of_an_external_temperature_sensor).turn_off();
           }
           return true;
 
