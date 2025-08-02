@@ -122,7 +122,7 @@ climate:
 switch:
   - platform: haier
     health_mode:
-      name: "[Modbus Coil 6] Health mode"
+      name: "[Modbus Coil 9] Ionization/Health mode"
     display:
       name: "[Modbus Coil 2] Screen light"
 
@@ -436,24 +436,19 @@ modbus_controller:
           id(haier_ac).make_call().set_preset(CLIMATE_PRESET_COMFORT).perform();
           return true;
 
-      # Coil 5: Beeper (Not supported in SMARTAIR2)
+      # Coil 5: Beeper (NOTE: Not supported in SMARTAIR2)
       - address: 5
         value_type: COIL
         read_lambda: |-
           ESP_LOGD("modbus_coil_5", "Read Beeper state: OFF (not supported)");
           return 0;
 
-      # Coil 6: Health mode
+      # Coil 6: Eco mode (NOTE: Not supported by haier-esphome)
       - address: 6
         value_type: COIL
         read_lambda: |-
-          bool result = id(haier_ac).get_health_mode();
-          ESP_LOGD("modbus_coil_6", "Read Health mode state: %s", result ? "ON" : "OFF");
-          return result;
-        write_lambda: |-
-          ESP_LOGI("modbus_coil_6", "Write Health mode state: %s", x ? "ON" : "OFF");
-          id(haier_ac).set_health_mode(x);
-          return true;
+          ESP_LOGD("modbus_coil_6", "Read Eco state: OFF (not supported)");
+          return 0;
 
       # Coil 7: Turbo mode
       - address: 7
@@ -467,21 +462,26 @@ modbus_controller:
           id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();
           return true;
 
-      # Coil 8: Sleep mode (Not supported in SMARTAIR2)
+      # Coil 8: Sleep mode (NOTE: Not supported in SMARTAIR2)
       - address: 8
         value_type: COIL
         read_lambda: |-
           ESP_LOGD("modbus_coil_8", "Read Sleep mode state: OFF (not supported)");
           return 0;
 
-      # Coil 9: Ionization (Not supported in SMARTAIR2)
+      # Coil 9: Ionization/Health mode
       - address: 9
         value_type: COIL
         read_lambda: |-
-          ESP_LOGD("modbus_coil_9", "Read Ionization state: OFF (not supported)");
-          return 0;
+          bool result = id(haier_ac).get_health_mode();
+          ESP_LOGD("modbus_coil_9", "Read Health mode state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_9", "Write Health mode state: %s", x ? "ON" : "OFF");
+          id(haier_ac).set_health_mode(x);
+          return true;        
 
-      # Coil 10: Self cleaning (Not supported in SMARTAIR2)
+      # Coil 10: Self cleaning (NOTE: Not supported in SMARTAIR2)
       - address: 10
         value_type: COIL
         read_lambda: |-
@@ -495,6 +495,22 @@ modbus_controller:
           bool result = id(haier_ac).valid_connection();
           ESP_LOGD("modbus_coil_20", "Read AC connected state: %s", result ? "CONNECTED" : "DISCONNECTED");
           return result;
+
+      # Coil 150: Away mode (NOTE: Missing in config-onokom-air-hr-1-mb-b.json)
+      - address: 150
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY;
+          ESP_LOGD("modbus_coil_4", "Read Away mode state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_4", "Write Away mode state: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();
+          } else {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();
+          }
+          return true;    
 
       # Coil 92: Show fan as range
       - address: 92
@@ -624,7 +640,7 @@ modbus_controller:
           ESP_LOGD("modbus_holding_3", "Read Indoor temperature: %.2f°C (raw: %d)", temp + correction, result);
           return result;
 
-      # Holding 4 - Outdoor air temperature (Not supported in SMARTAIR2)
+      # Holding 4 - Outdoor air temperature (NOTE: Not supported in SMARTAIR2)
       - address: 4
         value_type: S_WORD
         read_lambda: |-
@@ -719,14 +735,14 @@ modbus_controller:
             default: return false;
           }
 
-      # Holding 9 - Horizontal vanes (Not supported in haier-esphome) TODO
+      # Holding 9 - Horizontal vanes (NOTE: Not supported in haier-esphome) TODO
       - address: 9
         value_type: U_WORD
         read_lambda: |-
           ESP_LOGD("modbus_holding_9", "Read Horizontal vanes: 0 (not supported)");
           return 0;
 
-      # Holding 10 - Vertical vanes (Not supported in haier-esphome) TODO
+      # Holding 10 - Vertical vanes (NOTE: Not supported in haier-esphome) TODO
       - address: 10
         value_type: U_WORD
         read_lambda: |-
