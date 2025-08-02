@@ -1,6 +1,6 @@
 esphome:
-  name: testdevice
-  friendly_name: TestDevice
+  name: haier-ac-modbus-smartair2
+  friendly_name: "Haier AC Modbus Adapter"
   on_boot:
     priority: -100  # Run after all components are initialized
     then:
@@ -53,8 +53,8 @@ wifi:
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: "Testdevice Fallback Hotspot"
-    password: "kRKFGZlIsGRx"
+    ssid: "Haier AC Modbus Adapter"
+    password: ""
 
 # Enable logging
 logger:
@@ -95,7 +95,7 @@ modbus:
 climate:
   - platform: haier
     id: haier_ac
-    name: "Haier Air Conditioner"
+    name: "Climate Control"
     uart_id: haier_uart
     protocol: SMARTAIR2
     wifi_signal: true
