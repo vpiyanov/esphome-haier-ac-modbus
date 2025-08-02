@@ -425,7 +425,7 @@ modbus_controller:
           return true;
 
       # Coil 4: Quiet mode
-      - address: 3
+      - address: 4
         value_type: COIL
         read_lambda: |-
           bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_COMFORT;
