@@ -41,11 +41,11 @@ esp32:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "i9F3/CGTQ1FtxwJ5FHP8fE5QOUY/DP8n+KeG1iM4dYw="
+    key: !secret api_encryption_key
 
 ota:
   - platform: esphome
-    password: "3cd8dc1b92701bcd0909ad94af44edcc"
+    password: !secret ota_password
 
 wifi:
   ssid: !secret wifi_ssid
@@ -101,20 +101,21 @@ climate:
     wifi_signal: true
     display: true
     supported_modes:
-      - 'OFF'
-      - HEAT_COOL
-      - COOL
-      - HEAT
-      - DRY
-      - FAN_ONLY
+      - "OFF"
+      - "HEAT_COOL"
+      - "COOL"
+      - "HEAT"
+      - "DRY"
+      - "FAN_ONLY"
     supported_swing_modes:
-      - 'OFF'
-      - VERTICAL
-      - HORIZONTAL
-      - BOTH
-    supported_presets: # TODO CLIMATE_PRESET_AWAY
-      - BOOST
-      - COMFORT
+      - "OFF"
+      - "VERTICAL"
+      - "HORIZONTAL"
+      - "BOTH"
+    supported_presets:
+      - "AWAY"
+      - "BOOST"
+      - "COMFORT"
 
 
 # Switches for additional Haier features
@@ -167,6 +168,35 @@ button:
     name: "[Modbus Holding 120] Restart Device"
 
 select:
+  - id: haier_preset_select
+    name: "Climate Preset"
+    platform: template
+    options:
+      - "None"
+      - "Away"
+      - "Boost"
+      - "Comfort"
+    optimistic: false
+    lambda: |-
+      switch (id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE)) {
+        case CLIMATE_PRESET_AWAY: return std::string("Away");
+        case CLIMATE_PRESET_BOOST: return std::string("Boost");
+        case CLIMATE_PRESET_COMFORT: return std::string("Comfort");
+        default: return std::string("None");
+      }
+    set_action:
+      - lambda: |-
+          ESP_LOGI("haier_preset", "Setting preset to: %s", x.c_str());
+          if (x == "Away") {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();
+          } else if (x == "Boost") {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();
+          } else if (x == "Comfort") {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_COMFORT).perform();
+          } else {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();
+          }
+
   - id: modbus_baud_rate
     name: "[Modbus Holding 110] Baud rate"
     platform: template
