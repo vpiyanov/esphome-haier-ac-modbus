@@ -130,7 +130,7 @@ switch:
 
   - platform: template
     id: haier_ac_health_mode
-    name: "[Modbus 6] Health mode"
+    name: "[Modbus Coil 6] Health mode"
     icon: mdi:leaf
     lambda: |-
       return id(haier_ac).get_health_mode();
@@ -281,6 +281,7 @@ number:
     step: 1
     restore_value: true
     optimistic: true
+    mode: box
     set_action:
       - lambda: |-
           int address = x;
@@ -346,16 +347,12 @@ modbus_controller:
       - address: 2
         value_type: COIL
         read_lambda: |-
-          bool result = id(haier_display_switch).state;
+          bool result = id(haier_ac).get_display_state();
           ESP_LOGD("modbus_coil_2", "Read Screen light state: %s", result ? "ON" : "OFF");
           return result;
         write_lambda: |-
           ESP_LOGI("modbus_coil_2", "Write Screen light state: %s", x ? "ON" : "OFF");
-          if (x) {
-            id(haier_display_switch).turn_on();
-          } else {
-            id(haier_display_switch).turn_off();
-          }
+          id(haier_ac).set_display_state(x);
           return true;
 
       # Coil 4: Quiet mode
@@ -377,20 +374,16 @@ modbus_controller:
           ESP_LOGD("modbus_coil_5", "Read Beeper state: OFF (not supported)");
           return 0;
 
-      # Coil 6: Eco
-      - address: 2
+      # Coil 6: Health mode
+      - address: 6
         value_type: COIL
         read_lambda: |-
-          bool result = id(haier_ac_health_mode).state;
-          ESP_LOGD("modbus_coil_6", "Read Eco mode state: %s", result ? "ON" : "OFF");
+          bool result = id(haier_ac).get_health_mode();
+          ESP_LOGD("modbus_coil_6", "Read Health mode state: %s", result ? "ON" : "OFF");
           return result;
         write_lambda: |-
-          ESP_LOGI("modbus_coil_6", "Write Eco mode state: %s", x ? "ON" : "OFF");
-          if (x) {
-            id(haier_ac_health_mode).turn_on();
-          } else {
-            id(haier_ac_health_mode).turn_off();
-          }
+          ESP_LOGI("modbus_coil_6", "Write Health mode state: %s", x ? "ON" : "OFF");
+          id(haier_ac).set_health_mode(x);
           return true;
 
       # Coil 7: Turbo mode
