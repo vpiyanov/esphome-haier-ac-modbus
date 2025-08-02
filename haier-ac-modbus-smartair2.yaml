@@ -226,6 +226,35 @@ select:
             id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform();
           }
 
+  - id: haier_swing_mode_select
+    name: "Climate Swing Mode"
+    platform: template
+    options:
+      - "Off"
+      - "Vertical"
+      - "Horizontal"
+      - "Both"
+    optimistic: false
+    lambda: |-
+      switch (id(haier_ac).swing_mode) {
+        case CLIMATE_SWING_VERTICAL: return std::string("Vertical");
+        case CLIMATE_SWING_HORIZONTAL: return std::string("Horizontal");
+        case CLIMATE_SWING_BOTH: return std::string("Both");
+        default: return std::string("Off");
+      }
+    set_action:
+      - lambda: |-
+          ESP_LOGI("haier_swing_mode", "Setting swing mode to: %s", x.c_str());
+          if (x == "Vertical") {
+            id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_VERTICAL).perform();
+          } else if (x == "Horizontal") {
+            id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_HORIZONTAL).perform();
+          } else if (x == "Both") {
+            id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_BOTH).perform();
+          } else {
+            id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_OFF).perform();
+          }
+
   - id: modbus_baud_rate
     name: "[Modbus Holding 110] Baud rate"
     platform: template
