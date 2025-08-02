@@ -727,13 +727,11 @@ modbus_controller:
         value_type: U_WORD
         read_lambda: |-
           std::string parity_bit = id(modbus_parity_bit).state;
-          int result;
+          int result = 0;
           if (parity_bit == "Odd") {
             result = 1;
           } else if (parity_bit == "Even") {
             result = 2;
-          } else {
-            result = 0;
           }
           ESP_LOGD("modbus_holding_111", "Read Parity bit: %s (%d)", parity_bit.c_str(), result);
           return result;
@@ -767,13 +765,10 @@ modbus_controller:
           return 0;
         write_lambda: |-
           ESP_LOGI("modbus_holding_120", "Write Reboot device: %d", x);
-          if (x == 1) {
-            ESP_LOGW("modbus_reboot", "Reboot requested via Modbus register 120");
+          if (x) {
             id(restart_button).press();
-            return true;
           }
-          return false;
-
+          return true;
       # Holding 128 - Modbus Address
       - address: 128
         value_type: U_WORD
