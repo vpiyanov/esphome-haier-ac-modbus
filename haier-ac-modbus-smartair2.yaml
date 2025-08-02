@@ -656,11 +656,30 @@ modbus_controller:
       - address: 3
         value_type: S_WORD
         read_lambda: |-
-          float temp = id(haier_ac).current_temperature;
+          float ac_current_temp = id(haier_ac).current_temperature;
           float correction = id(modbus_temperature_correction_number).state;
-          int result = (temp + correction) * 100; // Scale to 0.01 degree resolution
-          ESP_LOGD("modbus_holding_3", "Read Indoor temperature: %.2f°C (raw: %d)", temp + correction, result);
+          float external_current_temp = ac_current_temp + correction;
+          
+          int result = external_current_temp * 100; // Scale to 0.01 degree resolution          
+          ESP_LOGD("modbus_holding_3", "Read Indoor temperature: %.2f°C (raw: %d)", external_current_temp, result);
           return result;
+        write_lambda: |-
+          if (id(modbus_allow_the_use_of_an_external_temperature_sensor).state) {
+            float ac_current_temp = id(haier_ac).current_temperature;
+            float ac_target_temp = id(haier_ac).target_temperature;
+
+            float current_correction = id(modbus_temperature_correction_number).state;
+            float external_current_temp = ((float)x) / 100.0;  // Convert from 0.01 scale
+            float external_target_temp = ac_target_temp + current_correction;
+
+            float new_correction = external_current_temp - ac_current_temp;
+            float new_ac_target_temp = external_target_temp - new_correction;
+            ESP_LOGD("modbus_holding_3", "Write Indoor air temperature: external_current_temp: %.2f°C (raw: %d), new_correction: %.2f°C, new_ac_target_temp:  %.2f°C", 
+              external_current_temp, x, new_correction, new_ac_target_temp);
+            id(modbus_temperature_correction_number).make_call().set_value(new_correction).perform();
+            id(haier_ac).make_call().set_target_temperature(new_ac_target_temp).perform();
+          }
+          return false;
 
       # Holding 4 - Outdoor air temperature (NOTE: Not supported in SMARTAIR2)
       - address: 4
@@ -673,16 +692,22 @@ modbus_controller:
       - address: 5
         value_type: S_WORD
         read_lambda: |-
-          float temp = id(haier_ac).target_temperature;
+          float ac_target_temp = id(haier_ac).target_temperature;
           float correction = id(modbus_temperature_correction_number).state;
-          int result = (temp + correction) * 100;  // Scale to 0.01 degree resolution
-          ESP_LOGD("modbus_holding_5", "Read Target temperature: %.2f°C (raw: %d)", temp + correction, result);
+          float external_target_temp = ac_target_temp + correction;
+          
+          int result = external_target_temp * 100;  // Scale to 0.01 degree resolution
+          ESP_LOGD("modbus_holding_5", "Read Target temperature: ac_target_temp: %.2f°C, external_target_temp: %.2f°C (raw: %d)", 
+            ac_target_temp, external_target_temp, result);
           return result;
         write_lambda: |-
           float correction = id(modbus_temperature_correction_number).state;
-          float temp = ((float)x) / 100.0;  // Convert from 0.01 scale
-          ESP_LOGI("modbus_holding_5", "Write Target temperature: %.2f°C (raw: %d)", temp - correction, x);
-          id(haier_ac).make_call().set_target_temperature(temp - correction).perform();
+          float external_target_temp = ((float)x) / 100.0;  // Convert from 0.01 scale
+          float ac_target_temp = external_target_temp - correction;
+          
+          ESP_LOGI("modbus_holding_5", "Write Target temperature: external_target_temp: %.2f°C (raw: %d), ac_target_temp: %.2f°C", 
+            external_target_temp, x, ac_target_temp);
+          id(haier_ac).make_call().set_target_temperature(ac_target_temp).perform();
           return true;
 
       # Holding 6 - Thermostat state (TODO)
