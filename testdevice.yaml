@@ -38,15 +38,10 @@ esp32:
   framework:
     type: arduino
 
-# Enable logging
-logger:
-  baud_rate: 0
-
 # Enable Home Assistant API
 api:
   encryption:
     key: "i9F3/CGTQ1FtxwJ5FHP8fE5QOUY/DP8n+KeG1iM4dYw="
-
 
 ota:
   - platform: esphome
@@ -60,6 +55,14 @@ wifi:
   ap:
     ssid: "Testdevice Fallback Hotspot"
     password: "kRKFGZlIsGRx"
+
+# Enable logging
+logger:
+  baud_rate: 0
+
+# Status LED
+status_led:
+  pin: GPIO2
 
 web_server:
 
@@ -116,8 +119,13 @@ climate:
 
 # Switches for additional Haier features
 switch:
+  - platform: haier
+    health_mode:
+      name: "[Modbus Coil 6] Health mode"
+    display:
+      name: "[Modbus Coil 2] Screen light"
 
-  # Supported by smartAir2 only:
+  # NOTE: Supported by SMARTAIR2 only:
   - platform: template
     id: alternative_swing_control
     name: "Alternative swing control"
@@ -127,29 +135,6 @@ switch:
       - lambda: id(haier_ac).set_alternative_swing_control(true);
     turn_off_action:
       - lambda: id(haier_ac).set_alternative_swing_control(false);
-
-  - platform: template
-    id: haier_ac_health_mode
-    name: "[Modbus Coil 6] Health mode"
-    icon: mdi:leaf
-    lambda: |-
-      return id(haier_ac).get_health_mode();
-    turn_on_action:
-      climate.haier.health_on: haier_ac
-    turn_off_action:
-      climate.haier.health_off: haier_ac
-
-  - platform: template
-    id: haier_display_switch
-    name: "[Modbus Coil 2] Screen light"
-    icon: mdi:led-on
-    entity_category: config
-    lambda: |-
-      return id(haier_ac).get_display_state();
-    turn_on_action:
-      - climate.haier.display_on: haier_ac
-    turn_off_action:
-      - climate.haier.display_off: haier_ac
 
   # Used to store Modbus register values:
   - platform: template
@@ -288,10 +273,6 @@ number:
           ESP_LOGI("modbus_address", "Changing Modbus address to %d", address);
           id(modbus_controller_server).set_address(address);
           ESP_LOGI("modbus_address", "Modbus address successfully changed to %d", address);
-
-# Status LED
-status_led:
-  pin: GPIO2
 
 # Additional sensors for monitoring
 sensor:
