@@ -197,6 +197,35 @@ select:
             id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();
           }
 
+  - id: haier_fan_mode_select
+    name: "Climate Fan Mode"
+    platform: template
+    options:
+      - "Auto"
+      - "Low"
+      - "Medium"
+      - "High"
+    optimistic: false
+    lambda: |-
+      switch (id(haier_ac).fan_mode.value_or(CLIMATE_FAN_AUTO)) {
+        case CLIMATE_FAN_LOW: return std::string("Low");
+        case CLIMATE_FAN_MEDIUM: return std::string("Medium");
+        case CLIMATE_FAN_HIGH: return std::string("High");
+        default: return std::string("Auto");
+      }
+    set_action:
+      - lambda: |-
+          ESP_LOGI("haier_fan_mode", "Setting fan mode to: %s", x.c_str());
+          if (x == "Low") {
+            id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_LOW).perform();
+          } else if (x == "Medium") {
+            id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_MEDIUM).perform();
+          } else if (x == "High") {
+            id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_HIGH).perform();
+          } else {
+            id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform();
+          }
+
   - id: modbus_baud_rate
     name: "[Modbus Holding 110] Baud rate"
     platform: template
