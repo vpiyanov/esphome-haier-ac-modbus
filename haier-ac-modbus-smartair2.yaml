@@ -33,6 +33,15 @@ esphome:
           id(modbus_uart).load_settings();
           ESP_LOGI("boot", "UART configuration applied successfully");
 
+          // Apply restored WiFi enable state
+          bool wifi_enabled = id(wifi_enable_switch).state;
+          ESP_LOGI("boot", "Setting WiFi state to: %s", wifi_enabled ? "ENABLED" : "DISABLED");
+          if (wifi_enabled) {
+            id(wifi_component).enable();
+          } else {
+            id(wifi_component).disable();
+          }
+
 esp32:
   board: esp32dev
   framework:
@@ -48,6 +57,7 @@ ota:
     password: !secret ota_password
 
 wifi:
+  id: wifi_component
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
@@ -167,6 +177,20 @@ switch:
     name: "[Modbus Coil 100] Allow the use of an external temperature sensor"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
+
+  - platform: template
+    id: wifi_enable_switch
+    name: "WiFi Enable"
+    restore_mode: RESTORE_DEFAULT_ON
+    optimistic: true
+    turn_on_action:
+      - wifi.enable:
+          id: wifi_component
+      - logger.log: "WiFi enabled"
+    turn_off_action:
+      - wifi.disable:
+          id: wifi_component
+      - logger.log: "WiFi disabled"
 
 button:
   - platform: restart
