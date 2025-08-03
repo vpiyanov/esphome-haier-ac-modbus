@@ -107,6 +107,14 @@ light:
 
 web_server:
   version: 3
+  sorting_groups:
+    - id: ac_configuration
+      name: "AC Configuration"
+      sorting_weight: 10
+    - id: modbus_configuration
+      name: "Modbus Configuration"
+      sorting_weight: 20
+
 
 captive_portal:
 
@@ -150,6 +158,8 @@ switch:
       name: "[Modbus Coil 9] Ionization/Health mode"
     display:
       name: "[Modbus Coil 2] Screen light"
+      web_server:
+        sorting_group_id: ac_configuration
 
   # Used to store Modbus register values:
   - platform: template
@@ -158,6 +168,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_show_vanes_as_range
@@ -165,6 +177,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_show_thermostat_state_as_range
@@ -172,6 +186,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_show_modes_as_range
@@ -179,6 +195,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_allow_the_use_of_an_external_temperature_sensor
@@ -186,6 +204,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
 
   # NOTE: Supported by SMARTAIR2 only:
   - platform: template
@@ -194,6 +214,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_group_id: ac_configuration
     turn_on_action:
       - lambda: id(haier_ac).set_alternative_swing_control(true);
     turn_off_action:
@@ -201,7 +223,7 @@ switch:
 
   - platform: template
     id: wifi_enable_switch
-    name: "[Modbus Coil 1003] WiFi Enable"
+    name: "[Modbus Coil 1003] Adapter WiFi Enable"
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     entity_category: config
@@ -214,10 +236,12 @@ switch:
 
   - platform: template
     id: send_wifi_status_to_ac
-    name: "[Modbus Coil 1004] Send wifi status to AC"
+    name: "[Modbus Coil 1004] Send WiFi status to AC"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_group_id: ac_configuration
     turn_on_action:
       - lambda: id(haier_ac).set_send_wifi(true);
     turn_off_action:
@@ -338,6 +362,8 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
     set_action:
       - lambda: |-
           uint32_t new_baud_rate = std::stoul(x);
@@ -359,6 +385,8 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
     set_action:
       - lambda: |-
           UARTParityOptions new_parity = UART_CONFIG_PARITY_NONE;
@@ -384,6 +412,8 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
     set_action:
       - lambda: |-
           uint32_t new_stop_bits = std::stoul(x);
@@ -408,7 +438,6 @@ binary_sensor:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: true
-    name: "Boot Button"
     on_click:
       - min_length: 50ms
         max_length: 5s
@@ -444,6 +473,8 @@ number:
     optimistic: true
     unit_of_measurement: "°C"
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_address_number
@@ -456,6 +487,8 @@ number:
     optimistic: true
     mode: box
     entity_category: config
+    web_server:
+      sorting_group_id: modbus_configuration
     set_action:
       - lambda: |-
           int address = x;
