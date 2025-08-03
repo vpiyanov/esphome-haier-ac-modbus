@@ -42,6 +42,11 @@ esphome:
             wifi::global_wifi_component->disable();
           }
 
+          // Apply restored send WiFi status to AC setting
+          bool send_wifi_status = id(send_wifi_status_to_ac).state;
+          ESP_LOGI("boot", "Setting send WiFi status to AC to: %s", send_wifi_status ? "ON" : "OFF");
+          id(haier_ac).set_send_wifi(send_wifi_status);
+
 esp32:
   board: esp32dev
   framework:
@@ -190,6 +195,16 @@ switch:
     turn_off_action:
       - wifi.disable:
       - logger.log: "WiFi disabled"
+
+  - platform: template
+    id: send_wifi_status_to_ac
+    name: "[Modbus Coil 1004] Send wifi status to AC"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    turn_on_action:
+      - lambda: id(haier_ac).set_send_wifi(true);
+    turn_off_action:
+      - lambda: id(haier_ac).set_send_wifi(false);
 
 button:
   - platform: restart
@@ -1075,5 +1090,21 @@ modbus_controller:
             id(wifi_enable_switch).turn_on();
           } else {
             id(wifi_enable_switch).turn_off();
+          }
+          return true;
+
+      # Coil 1004: Send WiFi Status to AC
+      - address: 1004
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(send_wifi_status_to_ac).state;
+          ESP_LOGD("modbus_coil_1004", "Read Send WiFi Status to AC state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_1004", "Write Send WiFi Status to AC state: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(send_wifi_status_to_ac).turn_on();
+          } else {
+            id(send_wifi_status_to_ac).turn_off();
           }
           return true;    
