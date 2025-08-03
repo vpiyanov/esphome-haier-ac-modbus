@@ -874,19 +874,16 @@ modbus_controller:
       # Holding 6 - Thermostat state
       - address: 6
         value_type: U_WORD
-        read_lambda: |-
-          int result = 0;  // Default to Idle
-          
+        read_lambda: |-          
           float current_temp = id(haier_ac).current_temperature;
           float target_temp = id(haier_ac).target_temperature;
           ClimateMode mode = id(haier_ac).mode;
           
+          int result = 0;  // Default to Idle
           if ((mode == CLIMATE_MODE_HEAT || mode == CLIMATE_MODE_HEAT_COOL) && current_temp < target_temp) {
             result = 1;  // Heating
           } else if ((mode == CLIMATE_MODE_COOL || mode == CLIMATE_MODE_HEAT_COOL) && current_temp > target_temp) {
             result = 2;  // Cooling
-          } else {
-            result = 0;  // Idle (default for any other mode)
           }
           
           ESP_LOGD("modbus_holding_6", "Read Thermostat state: %d (mode: %d, current: %.1f°C, target: %.1f°C)", 
@@ -1088,6 +1085,16 @@ modbus_controller:
             return false;
           }
 
+      # Input 124 - MCU Temperature
+      - address: 124
+        value_type: S_WORD
+        read_lambda: |-
+          int result = id(mcu_temperature_sensor).state * 10;  // Scale to 0.1 degree resolution
+          ESP_LOGD("modbus_input_124", "Read MCU Temperature: %.1f°C (raw: %d)", id(mcu_temperature_sensor).state, result);
+          return result;
+
+      # NOTE: Below some modbus registers defined in config-onokom-air-hr-1-mb-b.json but not actually used:
+
       # Holding 200 - HW Version
       - address: 200
         value_type: U_WORD
@@ -1115,14 +1122,6 @@ modbus_controller:
         read_lambda: |-
           ESP_LOGD("modbus_holding_270", "Read Serial: 0");
           return 0;
-
-      # Input 124 - MCU Temperature
-      - address: 124
-        value_type: S_WORD
-        read_lambda: |-
-          int result = id(mcu_temperature_sensor).state * 10;  // Scale to 0.1 degree resolution
-          ESP_LOGD("modbus_input_124", "Read MCU Temperature: %.1f°C (raw: %d)", id(mcu_temperature_sensor).state, result);
-          return result;
 
       # Input 290 - Signature
       - address: 290
