@@ -549,6 +549,25 @@ sensor:
     update_interval: 60s
     entity_category: diagnostic
 
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: WiFi IP Address
+      icon: "mdi:wifi"
+    ssid:
+      name: WiFi Connected SSID
+      icon: "mdi:wifi"
+    bssid:
+      name: WiFi Connected BSSID
+      icon: "mdi:wifi"
+    mac_address:
+      name: WiFi Mac Address
+      icon: "mdi:wifi"
+    dns_address:
+      name: WiFi DNS Address
+      icon: "mdi:wifi"
+
 # Modbus controller with server registers based on ONOKOM-AIR-HR-1-MB-B specification
 modbus_controller:
   - modbus_id: modbus_server
