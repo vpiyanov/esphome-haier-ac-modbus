@@ -502,22 +502,6 @@ modbus_controller:
           ESP_LOGD("modbus_coil_20", "Read AC connected state: %s", result ? "CONNECTED" : "DISCONNECTED");
           return result;
 
-      # Coil 1001: Away mode (NOTE: Custom, not defined in config-onokom-air-hr-1-mb-b.json)
-      - address: 1001
-        value_type: COIL
-        read_lambda: |-
-          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY;
-          ESP_LOGD("modbus_coil_4", "Read Away mode state: %s", result ? "ON" : "OFF");
-          return result;
-        write_lambda: |-
-          ESP_LOGI("modbus_coil_4", "Write Away mode state: %s", x ? "ON" : "OFF");
-          if (x) {
-            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();
-          } else {
-            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();
-          }
-          return true;    
-
       # Coil 92: Show fan as range
       - address: 92
         value_type: COIL
@@ -974,3 +958,19 @@ modbus_controller:
         read_lambda: |-
           ESP_LOGD("modbus_input_400", "Read PROTO Version: 0");
           return 0;
+
+      # Coil 1001: Away mode (NOTE: Custom, not defined in config-onokom-air-hr-1-mb-b.json)
+      - address: 1001
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY;
+          ESP_LOGD("modbus_coil_4", "Read Away mode state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_4", "Write Away mode state: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();
+          } else {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();
+          }
+          return true;    
