@@ -103,10 +103,12 @@ light:
   - platform: status_led
     name: "Status LED"
     pin: GPIO01
+    icon: "mdi:led-on"
     entity_category: diagnostic
 
 web_server:
   version: 3
+  local: true
   sorting_groups:
     - id: ac_configuration
       name: "AC Configuration"
@@ -129,6 +131,7 @@ climate:
   - platform: haier
     id: haier_ac
     name: "Climate Control"
+    icon: "mdi:air-conditioner"
     uart_id: haier_uart
     protocol: SMARTAIR2
     wifi_signal: true
@@ -156,8 +159,10 @@ switch:
   - platform: haier
     health_mode:
       name: "[Modbus Coil 9] Ionization/Health mode"
+      icon: "mdi:air-filter"
     display:
       name: "[Modbus Coil 2] Screen light"
+      icon: "mdi:monitor"
       web_server:
         sorting_group_id: ac_configuration
 
@@ -165,6 +170,7 @@ switch:
   - platform: template
     id: modbus_show_fan_as_range
     name: "[Modbus Coil 92] Show fan as range"
+    icon: "mdi:fan"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
@@ -174,6 +180,7 @@ switch:
   - platform: template
     id: modbus_show_vanes_as_range
     name: "[Modbus Coil 93] Show vanes as range"
+    icon: "mdi:arrow-oscillating"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
@@ -183,6 +190,7 @@ switch:
   - platform: template
     id: modbus_show_thermostat_state_as_range
     name: "[Modbus Coil 94] Show thermostat state as range"
+    icon: "mdi:thermometer"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
@@ -192,6 +200,7 @@ switch:
   - platform: template
     id: modbus_show_modes_as_range
     name: "[Modbus Coil 95] Show modes as range"
+    icon: "mdi:format-list-bulleted"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
@@ -201,6 +210,7 @@ switch:
   - platform: template
     id: modbus_allow_the_use_of_an_external_temperature_sensor
     name: "[Modbus Coil 100] Allow the use of an external temperature sensor"
+    icon: "mdi:thermometer-plus"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
@@ -211,6 +221,7 @@ switch:
   - platform: template
     id: alternative_swing_control
     name: "[Modbus Coil 1002] Alternative swing control"
+    icon: "mdi:swap-horizontal"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
@@ -224,6 +235,7 @@ switch:
   - platform: template
     id: wifi_enable_switch
     name: "[Modbus Coil 1003] Adapter WiFi Enable"
+    icon: "mdi:wifi"
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     entity_category: config
@@ -237,6 +249,7 @@ switch:
   - platform: template
     id: send_wifi_status_to_ac
     name: "[Modbus Coil 1004] Send WiFi status to AC"
+    icon: "mdi:wifi-sync"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
@@ -250,17 +263,20 @@ switch:
 button:
   - platform: restart
     id: restart_button
-    name: "[Modbus Holding 120] Restart Device"
+    name: "[Modbus Holding 120] Restart Adapter"
+    icon: "mdi:restart"
     entity_category: config
     
   - platform: factory_reset
     id: factory_reset_button
-    name: "[Modbus Coil 1000] Factory Reset"
+    name: "[Modbus Coil 1000] Adapter Factory Reset"
+    icon: "mdi:factory"
     entity_category: config
 
 select:
   - id: haier_preset_select
     name: "[Modbus Coils 4, 7, 1001 and Holding 8] Preset"
+    icon: "mdi:tune"
     platform: template
     options:
       - "None"
@@ -290,6 +306,7 @@ select:
 
   - id: haier_fan_mode_select
     name: "[Modbus Holding 7] Fan Mode"
+    icon: "mdi:fan"
     platform: template
     options:
       - "Auto"
@@ -319,6 +336,7 @@ select:
 
   - id: haier_swing_mode_select
     name: "[Modbus Holding 11] Swing Mode"
+    icon: "mdi:arrow-oscillating"
     platform: template
     options:
       - "Off"
@@ -348,6 +366,7 @@ select:
 
   - id: modbus_baud_rate
     name: "[Modbus Holding 110] Baud rate"
+    icon: "mdi:speedometer"
     platform: template
     options:
       - "2400"
@@ -376,6 +395,7 @@ select:
 
   - id: modbus_parity_bit
     name: "[Modbus Holding 111] Parity Bit"
+    icon: "mdi:check-circle"
     platform: template
     options:
       - "None"
@@ -404,6 +424,7 @@ select:
 
   - id: modbus_stop_bits
     name: "[Modbus Holding 112] Stop Bits"
+    icon: "mdi:stop-circle"
     platform: template
     options:
       - "1"
@@ -428,12 +449,15 @@ binary_sensor:
   - platform: template
     id: haier_connected_sensor
     name: "[Modbus Coil 20] AC Connected"
-    entity_category: diagnostic
+    icon: "mdi:connection"
     lambda: |-
       return id(haier_ac).valid_connection();
 
   - platform: gpio
     id: boot_button
+    name: "Boot Button"
+    icon: "mdi:gesture-tap-button"
+    internal: true
     pin: 
       number: GPIO0
       mode: INPUT_PULLUP
@@ -446,6 +470,9 @@ binary_sensor:
           - logger.log: "Boot button short press - WiFi toggled"
   - platform: template
     id: boot_button_longpress
+    name: "Boot Button Long Press"
+    icon: "mdi:gesture-tap-hold"
+    internal: true
     condition:
       binary_sensor.is_on: boot_button
     filters:
@@ -465,6 +492,7 @@ number:
   - platform: template
     id: modbus_temperature_correction_number
     name: "[Modbus Holding 14] Temperature Correction for Modbus"
+    icon: "mdi:thermometer-plus"
     min_value: -5
     max_value: 5
     initial_value: 0.0
@@ -479,6 +507,7 @@ number:
   - platform: template
     id: modbus_address_number
     name: "[Modbus Holding 128] Modbus Address"
+    icon: "mdi:identifier"
     min_value: 1
     max_value: 247
     initial_value: 1
@@ -501,19 +530,22 @@ sensor:
   - platform: internal_temperature
     id: mcu_temperature_sensor
     name: "[Modbus Input 124] MCU Temperature"
+    icon: "mdi:thermometer"
     unit_of_measurement: "°C"
     accuracy_decimals: 1
     entity_category: diagnostic
 
   - platform: template
-    name: "[Modbus Holding 3] Current Temperature"
+    name: "[Modbus Holding 3] Current Temperature (without correction)"
+    icon: "mdi:thermometer"
     lambda: |-
       return id(haier_ac).current_temperature;
     unit_of_measurement: "°C"
     accuracy_decimals: 1
 
   - platform: template
-    name: "[Modbus Holding 5] Target Temperature"
+    name: "[Modbus Holding 5] Target Temperature (without correction)"
+    icon: "mdi:thermometer-chevron-up"
     lambda: |-
       return id(haier_ac).target_temperature;
     unit_of_measurement: "°C"
@@ -522,17 +554,20 @@ sensor:
   - platform: uptime
     id: uptime_sensor
     name: "[Modbus Holding 104] Uptime"
+    icon: "mdi:clock-outline"
     type: seconds
     entity_category: diagnostic
 
   - platform: wifi_signal
     name: "WiFi Signal"
+    icon: "mdi:wifi"
     update_interval: 60s
     entity_category: diagnostic
 
   # Memory monitoring
   - platform: template
     name: "Free Heap"
+    icon: "mdi:memory"
     lambda: return ESP.getFreeHeap();
     unit_of_measurement: "bytes"
     update_interval: 60s
