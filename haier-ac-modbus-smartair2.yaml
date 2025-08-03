@@ -1,8 +1,7 @@
+# NOTE: Right now stable EspHome does not support Coil registers for ModBus server. Use custom branch:
 external_components:
   - source: github://gotnone/esphome@server_coil_hybrid
-    components:
-      - modbus
-      - modbus_controller
+    components: [modbus, modbus_controller]
 
 esphome:
   name: haier-ac-modbus-smartair2
