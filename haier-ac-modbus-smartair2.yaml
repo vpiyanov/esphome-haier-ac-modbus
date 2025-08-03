@@ -382,7 +382,7 @@ binary_sensor:
     condition:
       binary_sensor.is_on: boot_button
     filters:
-      - delayed_on: 5s
+      - delayed_on: 10s
     on_press: # Long press action:
         then:
           - logger.log: "Factory reset initiated - Long press detected (5+ seconds)"
@@ -390,7 +390,7 @@ binary_sensor:
               level: WARN
               tag: "factory_reset"
               format: "Performing factory reset - all settings will be cleared!"
-          - delay: 5s
+          - delay: 10s
           - button.press: factory_reset_button
 
 number:
