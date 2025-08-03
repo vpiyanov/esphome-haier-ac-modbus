@@ -194,6 +194,10 @@ button:
   - platform: restart
     id: restart_button
     name: "[Modbus Holding 120] Restart Device"
+    
+  - platform: factory_reset
+    id: factory_reset_button
+    name: "Factory Reset"
 
 select:
   - id: haier_preset_select
@@ -367,9 +371,22 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     name: "Boot Button"
-    on_press:
-      - switch.toggle: wifi_enable_switch
-      - logger.log: "Boot button pressed - WiFi toggled"
+    on_click:
+      - min_length: 50ms
+        max_length: 3000ms
+        then:
+          - switch.toggle: wifi_enable_switch
+          - logger.log: "Boot button short press - WiFi toggled"
+      - min_length: 5000ms
+        max_length: 30000ms
+        then:
+          - logger.log: "Factory reset initiated - Long press detected (5+ seconds)"
+          - logger.log: 
+              level: WARN
+              tag: "factory_reset"
+              format: "Performing factory reset - all settings will be cleared!"
+          - delay: 1s
+          - button.press: factory_reset_button
 
 number:
   # Used to store Modbus register values:
@@ -992,7 +1009,22 @@ modbus_controller:
           ESP_LOGD("modbus_input_400", "Read PROTO Version: 0");
           return 0;
 
-      # Coil 1001: Away mode (NOTE: Custom, not defined in config-onokom-air-hr-1-mb-b.json)
+      # NOTE: Below some custom modbus registers, not defined in config-onokom-air-hr-1-mb-b.json:
+
+      # Holding 1000 - Factory Reset
+      - address: 1000
+        value_type: U_WORD
+        read_lambda: |-
+          ESP_LOGD("modbus_holding_1000", "Read Factory reset: 0");
+          return 0;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_1000", "Write Factory reset: %d", x);
+          if (x) {
+            id(factory_reset_button).press();
+          }
+          return true;
+
+      # Coil 1001: Away mode
       - address: 1001
         value_type: COIL
         read_lambda: |-
@@ -1008,7 +1040,7 @@ modbus_controller:
           }
           return true;
 
-      # Coil 1002: Alternative swing control (NOTE: Custom, not defined in config-onokom-air-hr-1-mb-b.json)
+      # Coil 1002: Alternative swing control
       - address: 1002
         value_type: COIL
         read_lambda: |-
@@ -1024,7 +1056,7 @@ modbus_controller:
           }
           return true;
 
-      # Coil 1003: WiFi Enable (NOTE: Custom, not defined in config-onokom-air-hr-1-mb-b.json)
+      # Coil 1003: WiFi Enable
       - address: 1003
         value_type: COIL
         read_lambda: |-
