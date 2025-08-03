@@ -37,9 +37,9 @@ esphome:
           bool wifi_enabled = id(wifi_enable_switch).state;
           ESP_LOGI("boot", "Setting WiFi state to: %s", wifi_enabled ? "ENABLED" : "DISABLED");
           if (wifi_enabled) {
-            id(wifi_component).enable();
+            wifi::global_wifi_component->enable();
           } else {
-            id(wifi_component).disable();
+            wifi::global_wifi_component->disable();
           }
 
 esp32:
@@ -185,11 +185,9 @@ switch:
     optimistic: true
     turn_on_action:
       - wifi.enable:
-          id: wifi_component
       - logger.log: "WiFi enabled"
     turn_off_action:
       - wifi.disable:
-          id: wifi_component
       - logger.log: "WiFi disabled"
 
 button:
@@ -361,6 +359,17 @@ binary_sensor:
     name: "[Modbus Coil 20] AC Connected"
     lambda: |-
       return id(haier_ac).valid_connection();
+
+  - platform: gpio
+    id: boot_button
+    pin: 
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Boot Button"
+    on_press:
+      - switch.toggle: wifi_enable_switch
+      - logger.log: "Boot button pressed - WiFi toggled"
 
 number:
   # Used to store Modbus register values:
