@@ -502,8 +502,8 @@ modbus_controller:
           ESP_LOGD("modbus_coil_20", "Read AC connected state: %s", result ? "CONNECTED" : "DISCONNECTED");
           return result;
 
-      # Coil 150: Away mode (NOTE: Missing in config-onokom-air-hr-1-mb-b.json)
-      - address: 150
+      # Coil 1001: Away mode (NOTE: Custom, not defined in config-onokom-air-hr-1-mb-b.json)
+      - address: 1001
         value_type: COIL
         read_lambda: |-
           bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY;
