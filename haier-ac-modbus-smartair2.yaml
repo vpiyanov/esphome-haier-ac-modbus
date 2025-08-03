@@ -1,6 +1,9 @@
 esphome:
   name: haier-ac-modbus-smartair2
   friendly_name: "Haier AC Modbus Adapter"
+  project:
+    name: "vpiyanov.haier-ac-modbus-smartair2"
+    version: "1.0"
   on_boot:
     priority: -100  # Run after all components are initialized
     then:
@@ -16,14 +19,14 @@ esphome:
           id(haier_ac).set_alternative_swing_control(alt_swing);
 
           // Apply restored UART settings
-          uint32_t baud_rate = stoi(id(modbus_baud_rate).state);
+          uint32_t baud_rate = std::stoul(id(modbus_baud_rate).state);
           UARTParityOptions parity = UART_CONFIG_PARITY_NONE;
           if (id(modbus_parity_bit).state == "Odd") {
             parity = UART_CONFIG_PARITY_ODD;
           } else if (id(modbus_parity_bit).state == "Even") {
             parity = UART_CONFIG_PARITY_EVEN;
           }
-          uint32_t stop_bits = stoi(id(modbus_stop_bits).state);
+          uint32_t stop_bits = std::stoul(id(modbus_stop_bits).state);
 
           ESP_LOGI("boot", "Applying UART configuration: baud=%d, parity=%d, stop_bits=%d", baud_rate, parity, stop_bits);
           id(modbus_uart).flush();
@@ -65,25 +68,12 @@ wifi:
   id: wifi_component
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  fast_connect: true
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Haier AC Modbus Adapter"
     password: ""
-
-# Enable logging
-logger:
-  baud_rate: 0
-
-light:
-  - platform: status_led
-    name: "Status LED"
-    pin: GPIO01
-
-web_server:
-
-captive_portal:
-
 
 # UART configuration
 uart:
@@ -92,14 +82,33 @@ uart:
     baud_rate: 9600
     tx_pin: 19
     rx_pin: 18
-  
+
   # UART for Modbus server communication
   - id: modbus_uart
     baud_rate: 9600
-#    tx_pin: GPIO1
-#    rx_pin: GPIO3
+    #    tx_pin: GPIO1
+    #    rx_pin: GPIO3
     tx_pin: 17
     rx_pin: 16
+
+logger:
+  baud_rate: 0
+  level: INFO
+  logs:
+    modbus_controller.server: WARN
+    sensor: WARN
+    switch: WARN
+
+light:
+  - platform: status_led
+    name: "Status LED"
+    pin: GPIO01
+    entity_category: diagnostic
+
+web_server:
+  version: 3
+
+captive_portal:
 
 # Modbus server configuration
 modbus:
@@ -148,30 +157,35 @@ switch:
     name: "[Modbus Coil 92] Show fan as range"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
+    entity_category: config
 
   - platform: template
     id: modbus_show_vanes_as_range
     name: "[Modbus Coil 93] Show vanes as range"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
+    entity_category: config
 
   - platform: template
     id: modbus_show_thermostat_state_as_range
     name: "[Modbus Coil 94] Show thermostat state as range"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
+    entity_category: config
 
   - platform: template
     id: modbus_show_modes_as_range
     name: "[Modbus Coil 95] Show modes as range"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
+    entity_category: config
 
   - platform: template
     id: modbus_allow_the_use_of_an_external_temperature_sensor
     name: "[Modbus Coil 100] Allow the use of an external temperature sensor"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
+    entity_category: config
 
   # NOTE: Supported by SMARTAIR2 only:
   - platform: template
@@ -179,6 +193,7 @@ switch:
     name: "[Modbus Coil 1002] Alternative swing control"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
+    entity_category: config
     turn_on_action:
       - lambda: id(haier_ac).set_alternative_swing_control(true);
     turn_off_action:
@@ -189,6 +204,7 @@ switch:
     name: "[Modbus Coil 1003] WiFi Enable"
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
+    entity_category: config
     turn_on_action:
       - wifi.enable:
       - logger.log: "WiFi enabled"
@@ -201,6 +217,7 @@ switch:
     name: "[Modbus Coil 1004] Send wifi status to AC"
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
+    entity_category: config
     turn_on_action:
       - lambda: id(haier_ac).set_send_wifi(true);
     turn_off_action:
@@ -210,14 +227,16 @@ button:
   - platform: restart
     id: restart_button
     name: "[Modbus Holding 120] Restart Device"
+    entity_category: config
     
   - platform: factory_reset
     id: factory_reset_button
-    name: "Factory Reset"
+    name: "[Modbus Coil 1000] Factory Reset"
+    entity_category: config
 
 select:
   - id: haier_preset_select
-    name: "Climate Preset"
+    name: "[Modbus Coils 4, 7, 1001 and Holding 8] Preset"
     platform: template
     options:
       - "None"
@@ -246,7 +265,7 @@ select:
           }
 
   - id: haier_fan_mode_select
-    name: "Climate Fan Mode"
+    name: "[Modbus Holding 7] Fan Mode"
     platform: template
     options:
       - "Auto"
@@ -275,7 +294,7 @@ select:
           }
 
   - id: haier_swing_mode_select
-    name: "Climate Swing Mode"
+    name: "[Modbus Holding 11] Swing Mode"
     platform: template
     options:
       - "Off"
@@ -318,9 +337,10 @@ select:
     initial_option: "9600"
     optimistic: true
     restore_value: true
+    entity_category: config
     set_action:
       - lambda: |-
-          uint32_t new_baud_rate = stoi(x);
+          uint32_t new_baud_rate = std::stoul(x);
           ESP_LOGD("modbus_baud_rate", "Changing baud rate from %i to %i", id(modbus_uart).get_baud_rate(), new_baud_rate);
           if (id(modbus_uart).get_baud_rate() != new_baud_rate) {
             id(modbus_uart).flush();
@@ -338,6 +358,7 @@ select:
     initial_option: "None"
     optimistic: true
     restore_value: true
+    entity_category: config
     set_action:
       - lambda: |-
           UARTParityOptions new_parity = UART_CONFIG_PARITY_NONE;
@@ -357,15 +378,15 @@ select:
     name: "[Modbus Holding 112] Stop Bits"
     platform: template
     options:
-      - "0"
       - "1"
       - "2"
     initial_option: "2"
     optimistic: true
     restore_value: true
+    entity_category: config
     set_action:
       - lambda: |-
-          uint32_t new_stop_bits = stoi(x);
+          uint32_t new_stop_bits = std::stoul(x);
           ESP_LOGD("modbus_stop_bits", "Changing stop bits from %i to %i",id(modbus_uart).get_stop_bits(), new_stop_bits);
           if (id(modbus_uart).get_stop_bits() != new_stop_bits) {
             id(modbus_uart).flush();
@@ -377,6 +398,7 @@ binary_sensor:
   - platform: template
     id: haier_connected_sensor
     name: "[Modbus Coil 20] AC Connected"
+    entity_category: diagnostic
     lambda: |-
       return id(haier_ac).valid_connection();
 
@@ -401,7 +423,7 @@ binary_sensor:
       - delayed_on: 10s
     on_press: # Long press action:
         then:
-          - logger.log: "Factory reset initiated - Long press detected (5+ seconds)"
+          - logger.log: "Factory reset initiated - Long press detected (10+ seconds)"
           - logger.log:
               level: WARN
               tag: "factory_reset"
@@ -414,13 +436,14 @@ number:
   - platform: template
     id: modbus_temperature_correction_number
     name: "[Modbus Holding 14] Temperature Correction for Modbus"
-    min_value: -10
-    max_value: 10
+    min_value: -5
+    max_value: 5
     initial_value: 0.0
     step: 0.1
     restore_value: true
     optimistic: true
     unit_of_measurement: "°C"
+    entity_category: config
 
   - platform: template
     id: modbus_address_number
@@ -432,6 +455,7 @@ number:
     restore_value: true
     optimistic: true
     mode: box
+    entity_category: config
     set_action:
       - lambda: |-
           int address = x;
@@ -446,6 +470,7 @@ sensor:
     name: "[Modbus Input 124] MCU Temperature"
     unit_of_measurement: "°C"
     accuracy_decimals: 1
+    entity_category: diagnostic
 
   - platform: template
     name: "[Modbus Holding 3] Current Temperature"
@@ -465,6 +490,20 @@ sensor:
     id: uptime_sensor
     name: "[Modbus Holding 104] Uptime"
     type: seconds
+    entity_category: diagnostic
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    entity_category: diagnostic
+
+  # Memory monitoring
+  - platform: template
+    name: "Free Heap"
+    lambda: return ESP.getFreeHeap();
+    unit_of_measurement: "bytes"
+    update_interval: 60s
+    entity_category: diagnostic
 
 # Modbus controller with server registers based on ONOKOM-AIR-HR-1-MB-B specification
 modbus_controller:
@@ -908,7 +947,7 @@ modbus_controller:
       - address: 110
         value_type: U_WORD
         read_lambda: |-
-          int result = stoi(id(modbus_baud_rate).state) / 100;
+          int result = std::stoul(id(modbus_baud_rate).state) / 100;
           ESP_LOGD("modbus_holding_110", "Read Baud rate: %d (raw: %d)", result * 100, result);
           return result;
         write_lambda: |-
@@ -943,7 +982,7 @@ modbus_controller:
       - address: 112
         value_type: U_WORD
         read_lambda: |-
-          int result = stoi(id(modbus_stop_bits).state);
+          int result = std::stoul(id(modbus_stop_bits).state);
           ESP_LOGD("modbus_holding_112", "Read Stop bits: %d", result);
           return result;
         write_lambda: |-
@@ -977,8 +1016,10 @@ modbus_controller:
             id(modbus_address_number).make_call().set_value((float)x).perform();
             ESP_LOGI("modbus_address", "Modbus address changed via Modbus to: %d", x);
             return true;
+          } else {
+            ESP_LOGE("modbus_address", "Invalid Modbus address: %d", address);
+            return false;
           }
-          return false;
 
       # Holding 200 - HW Version
       - address: 200
