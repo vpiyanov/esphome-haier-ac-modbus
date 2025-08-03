@@ -136,17 +136,6 @@ switch:
     display:
       name: "[Modbus Coil 2] Screen light"
 
-  # NOTE: Supported by SMARTAIR2 only:
-  - platform: template
-    id: alternative_swing_control
-    name: "Alternative swing control"
-    restore_mode: RESTORE_DEFAULT_OFF
-    optimistic: true
-    turn_on_action:
-      - lambda: id(haier_ac).set_alternative_swing_control(true);
-    turn_off_action:
-      - lambda: id(haier_ac).set_alternative_swing_control(false);
-
   # Used to store Modbus register values:
   - platform: template
     id: modbus_show_fan_as_range
@@ -178,9 +167,20 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
 
+  # NOTE: Supported by SMARTAIR2 only:
+  - platform: template
+    id: alternative_swing_control
+    name: "[Modbus Coil 1002] Alternative swing control"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    turn_on_action:
+      - lambda: id(haier_ac).set_alternative_swing_control(true);
+    turn_off_action:
+      - lambda: id(haier_ac).set_alternative_swing_control(false);
+
   - platform: template
     id: wifi_enable_switch
-    name: "WiFi Enable"
+    name: "[Modbus Coil 1003] WiFi Enable"
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     turn_on_action:
@@ -1021,5 +1021,21 @@ modbus_controller:
             id(alternative_swing_control).turn_on();
           } else {
             id(alternative_swing_control).turn_off();
+          }
+          return true;
+
+      # Coil 1003: WiFi Enable (NOTE: Custom, not defined in config-onokom-air-hr-1-mb-b.json)
+      - address: 1003
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(wifi_enable_switch).state;
+          ESP_LOGD("modbus_coil_1003", "Read WiFi Enable state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_1003", "Write WiFi Enable state: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(wifi_enable_switch).turn_on();
+          } else {
+            id(wifi_enable_switch).turn_off();
           }
           return true;    
