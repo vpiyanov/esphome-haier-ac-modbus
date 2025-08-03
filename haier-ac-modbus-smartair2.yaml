@@ -70,9 +70,10 @@ wifi:
 logger:
   baud_rate: 0
 
-# Status LED
-status_led:
-  pin: GPIO2
+light:
+  - platform: status_led
+    name: "Status LED"
+    pin: GPIO01
 
 web_server:
 
@@ -90,10 +91,10 @@ uart:
   # UART for Modbus server communication
   - id: modbus_uart
     baud_rate: 9600
-    tx_pin: GPIO1
-    rx_pin: GPIO3
-#    tx_pin: 17
-#    rx_pin: 16
+#    tx_pin: GPIO1
+#    rx_pin: GPIO3
+    tx_pin: 17
+    rx_pin: 16
 
 # Modbus server configuration
 modbus:
