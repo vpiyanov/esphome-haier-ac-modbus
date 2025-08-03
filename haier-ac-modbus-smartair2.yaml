@@ -96,6 +96,9 @@ uart:
     tx_pin: 17
     rx_pin: 16
 
+status_led:
+  pin: GPIO1
+
 logger:
   baud_rate: 0
   level: INFO
@@ -104,20 +107,13 @@ logger:
     sensor: WARN
     switch: WARN
 
-light:
-  - platform: status_led
-    name: "Status LED"
-    pin: GPIO01
-    icon: "mdi:led-on"
-    entity_category: diagnostic
-
 web_server:
   version: 3
   local: true
   sorting_groups:
     - id: ac_configuration
       name: "AC Configuration"
-      sorting_weight: 10
+      sorting_weight: 0
 
 captive_portal:
 
@@ -131,7 +127,7 @@ modbus:
 climate:
   - platform: haier
     id: haier_ac
-    name: "Climate control"
+    name: "[Modbus Coil 1, Holding 1,2] Climate Mode"
     icon: "mdi:air-conditioner"
     uart_id: haier_uart
     protocol: SMARTAIR2
@@ -175,6 +171,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_weight: 80
 
   - platform: template
     id: modbus_show_vanes_as_range
@@ -183,6 +181,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_weight: 81
 
   - platform: template
     id: modbus_show_thermostat_state_as_range
@@ -191,6 +191,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_weight: 82
 
   - platform: template
     id: modbus_show_modes_as_range
@@ -199,6 +201,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_weight: 83
 
   - platform: template
     id: modbus_allow_the_use_of_an_external_temperature_sensor
@@ -207,6 +211,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_weight: 20
 
   # NOTE: Supported by SMARTAIR2 only:
   - platform: template
@@ -230,6 +236,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     optimistic: true
     entity_category: config
+    web_server:
+      sorting_weight: 5
     turn_on_action:
       - wifi.enable:
       - logger.log: "WiFi enabled"
@@ -257,12 +265,16 @@ button:
     name: "[Modbus Holding 120] Restart adapter"
     icon: "mdi:restart"
     entity_category: config
+    web_server:
+      sorting_weight: 100
     
   - platform: factory_reset
     id: factory_reset_button
     name: "[Modbus Coil 1000] Adapter factory reset"
     icon: "mdi:factory"
     entity_category: config
+    web_server:
+      sorting_weight: 110
 
 select:
   - id: haier_preset_select
@@ -372,6 +384,8 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
+    web_server:
+      sorting_weight: 11
     set_action:
       - lambda: |-
           uint32_t new_baud_rate = std::stoul(x);
@@ -394,6 +408,8 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
+    web_server:
+      sorting_weight: 12
     set_action:
       - lambda: |-
           UARTParityOptions new_parity = UART_CONFIG_PARITY_NONE;
@@ -420,6 +436,8 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
+    web_server:
+      sorting_weight: 13
     set_action:
       - lambda: |-
           uint32_t new_stop_bits = std::stoul(x);
@@ -486,6 +504,8 @@ number:
     optimistic: true
     unit_of_measurement: "°C"
     entity_category: config
+    web_server:
+      sorting_weight: 21
 
   - platform: template
     id: modbus_address_number
@@ -499,6 +519,8 @@ number:
     optimistic: true
     mode: box
     entity_category: config
+    web_server:
+      sorting_weight: 10
     set_action:
       - lambda: |-
           int address = x;
