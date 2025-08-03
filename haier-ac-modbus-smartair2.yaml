@@ -113,10 +113,6 @@ web_server:
     - id: ac_configuration
       name: "AC Configuration"
       sorting_weight: 10
-    - id: modbus_configuration
-      name: "Modbus Configuration"
-      sorting_weight: 20
-
 
 captive_portal:
 
@@ -130,7 +126,7 @@ modbus:
 climate:
   - platform: haier
     id: haier_ac
-    name: "Climate Control"
+    name: "Climate control"
     icon: "mdi:air-conditioner"
     uart_id: haier_uart
     protocol: SMARTAIR2
@@ -174,8 +170,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_show_vanes_as_range
@@ -184,8 +178,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_show_thermostat_state_as_range
@@ -194,8 +186,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_show_modes_as_range
@@ -204,8 +194,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_allow_the_use_of_an_external_temperature_sensor
@@ -214,8 +202,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     optimistic: true
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
 
   # NOTE: Supported by SMARTAIR2 only:
   - platform: template
@@ -263,13 +249,13 @@ switch:
 button:
   - platform: restart
     id: restart_button
-    name: "[Modbus Holding 120] Restart Adapter"
+    name: "[Modbus Holding 120] Restart adapter"
     icon: "mdi:restart"
     entity_category: config
     
   - platform: factory_reset
     id: factory_reset_button
-    name: "[Modbus Coil 1000] Adapter Factory Reset"
+    name: "[Modbus Coil 1000] Adapter factory reset"
     icon: "mdi:factory"
     entity_category: config
 
@@ -305,7 +291,7 @@ select:
           }
 
   - id: haier_fan_mode_select
-    name: "[Modbus Holding 7] Fan Mode"
+    name: "[Modbus Holding 7] Fan mode"
     icon: "mdi:fan"
     platform: template
     options:
@@ -335,7 +321,7 @@ select:
           }
 
   - id: haier_swing_mode_select
-    name: "[Modbus Holding 11] Swing Mode"
+    name: "[Modbus Holding 11] Swing mode"
     icon: "mdi:arrow-oscillating"
     platform: template
     options:
@@ -381,8 +367,6 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
     set_action:
       - lambda: |-
           uint32_t new_baud_rate = std::stoul(x);
@@ -394,7 +378,7 @@ select:
           }
 
   - id: modbus_parity_bit
-    name: "[Modbus Holding 111] Parity Bit"
+    name: "[Modbus Holding 111] Parity bit"
     icon: "mdi:check-circle"
     platform: template
     options:
@@ -405,8 +389,6 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
     set_action:
       - lambda: |-
           UARTParityOptions new_parity = UART_CONFIG_PARITY_NONE;
@@ -423,7 +405,7 @@ select:
           }
 
   - id: modbus_stop_bits
-    name: "[Modbus Holding 112] Stop Bits"
+    name: "[Modbus Holding 112] Stop bits"
     icon: "mdi:stop-circle"
     platform: template
     options:
@@ -433,8 +415,6 @@ select:
     optimistic: true
     restore_value: true
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
     set_action:
       - lambda: |-
           uint32_t new_stop_bits = std::stoul(x);
@@ -448,7 +428,7 @@ select:
 binary_sensor:
   - platform: template
     id: haier_connected_sensor
-    name: "[Modbus Coil 20] AC Connected"
+    name: "[Modbus Coil 20] AC connected"
     icon: "mdi:connection"
     lambda: |-
       return id(haier_ac).valid_connection();
@@ -491,7 +471,7 @@ number:
   # Used to store Modbus register values:
   - platform: template
     id: modbus_temperature_correction_number
-    name: "[Modbus Holding 14] Temperature Correction for Modbus"
+    name: "[Modbus Holding 14] Temperature correction for Modbus"
     icon: "mdi:thermometer-plus"
     min_value: -5
     max_value: 5
@@ -501,12 +481,10 @@ number:
     optimistic: true
     unit_of_measurement: "°C"
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
 
   - platform: template
     id: modbus_address_number
-    name: "[Modbus Holding 128] Modbus Address"
+    name: "[Modbus Holding 128] Modbus address"
     icon: "mdi:identifier"
     min_value: 1
     max_value: 247
@@ -516,8 +494,6 @@ number:
     optimistic: true
     mode: box
     entity_category: config
-    web_server:
-      sorting_group_id: modbus_configuration
     set_action:
       - lambda: |-
           int address = x;
@@ -529,14 +505,14 @@ number:
 sensor:
   - platform: internal_temperature
     id: mcu_temperature_sensor
-    name: "[Modbus Input 124] MCU Temperature"
+    name: "[Modbus Input 124] MCU temperature"
     icon: "mdi:thermometer"
     unit_of_measurement: "°C"
     accuracy_decimals: 1
     entity_category: diagnostic
 
   - platform: template
-    name: "[Modbus Holding 3] Current Temperature (without correction)"
+    name: "[Modbus Holding 3] Current temperature (without correction)"
     icon: "mdi:thermometer"
     lambda: |-
       return id(haier_ac).current_temperature;
@@ -544,7 +520,7 @@ sensor:
     accuracy_decimals: 1
 
   - platform: template
-    name: "[Modbus Holding 5] Target Temperature (without correction)"
+    name: "[Modbus Holding 5] Target temperature (without correction)"
     icon: "mdi:thermometer-chevron-up"
     lambda: |-
       return id(haier_ac).target_temperature;
