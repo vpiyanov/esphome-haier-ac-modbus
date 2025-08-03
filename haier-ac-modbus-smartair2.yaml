@@ -468,7 +468,7 @@ modbus_controller:
           id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();
           return true;
 
-      # Coil 8: Sleep mode (NOTE: Not supported in SMARTAIR2)
+      # Coil 8: Sleep mode (NOTE: Not supported by haier-esphome)
       - address: 8
         value_type: COIL
         read_lambda: |-
@@ -710,18 +710,26 @@ modbus_controller:
           id(haier_ac).make_call().set_target_temperature(ac_target_temp).perform();
           return true;
 
-      # Holding 6 - Thermostat state (TODO)
-      - address: 0x0106
+      # Holding 6 - Thermostat state
+      - address: 6
         value_type: U_WORD
         read_lambda: |-
-          auto action = id(haier_ac).action;
-          int result;
-          switch (action) {
-            case CLIMATE_ACTION_HEATING: result = 1; break;
-            case CLIMATE_ACTION_COOLING: result = 2; break;
-            default: result = 0;  // Idle
+          int result = 0;  // Default to Idle
+          
+          float current_temp = id(haier_ac).current_temperature;
+          float target_temp = id(haier_ac).target_temperature;
+          ClimateMode mode = id(haier_ac).mode;
+          
+          if ((mode == CLIMATE_MODE_HEAT || mode == CLIMATE_MODE_HEAT_COOL) && current_temp < target_temp) {
+            result = 1;  // Heating
+          } else if ((mode == CLIMATE_MODE_COOL || mode == CLIMATE_MODE_HEAT_COOL) && current_temp > target_temp) {
+            result = 2;  // Cooling
+          } else {
+            result = 0;  // Idle (default for any other mode)
           }
-          ESP_LOGD("modbus_holding_6", "Read Thermostat state: %d", result);
+          
+          ESP_LOGD("modbus_holding_6", "Read Thermostat state: %d (mode: %d, current: %.1f°C, target: %.1f°C)", 
+            result, (int)id(haier_ac).mode, current_temp, target_temp);
           return result;
 
       # Holding 7 - Fan speed
@@ -782,14 +790,14 @@ modbus_controller:
             default: return false;
           }
 
-      # Holding 9 - Horizontal vanes (NOTE: Not supported in haier-esphome) TODO
+      # Holding 9 - Horizontal vanes (NOTE: Not supported in haier-esphome)
       - address: 9
         value_type: U_WORD
         read_lambda: |-
           ESP_LOGD("modbus_holding_9", "Read Horizontal vanes: 0 (not supported)");
           return 0;
 
-      # Holding 10 - Vertical vanes (NOTE: Not supported in haier-esphome) TODO
+      # Holding 10 - Vertical vanes (NOTE: Not supported in haier-esphome)
       - address: 10
         value_type: U_WORD
         read_lambda: |-
