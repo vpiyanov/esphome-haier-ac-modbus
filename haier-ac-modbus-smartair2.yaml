@@ -91,10 +91,18 @@ uart:
   # UART for Modbus server communication
   - id: modbus_uart
     baud_rate: 9600
+    tx_pin: 33
+    rx_pin: 32
+    # UART connected to USB port:
     #    tx_pin: GPIO1
     #    rx_pin: GPIO3
-    tx_pin: 17
-    rx_pin: 16
+
+# Modbus server configuration
+modbus:
+  - uart_id: modbus_uart
+    id: modbus_server
+    role: server
+    flow_control_pin: GPIO25
 
 status_led:
   pin: GPIO1
@@ -117,11 +125,6 @@ web_server:
 
 captive_portal:
 
-# Modbus server configuration
-modbus:
-  - uart_id: modbus_uart
-    id: modbus_server
-    role: server
 
 # Haier climate component
 climate:
