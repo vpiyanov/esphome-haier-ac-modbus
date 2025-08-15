@@ -56,9 +56,9 @@ esphome:
           id(haier_ac).set_send_wifi(send_wifi_status);
 
 esp32:
-  board: esp32dev
+  board: esp32-c3-devkitm-1
   framework:
-    type: arduino
+    type: esp-idf
 
 # Enable Home Assistant API
 api:
@@ -82,30 +82,32 @@ wifi:
 
 # UART configuration
 uart:
-  # UART for Haier air conditioner communication
-  - id: haier_uart
-    baud_rate: 9600
-    tx_pin: 19
-    rx_pin: 18
-
   # UART for Modbus server communication
   - id: modbus_uart
     baud_rate: 9600
-    tx_pin: 33
-    rx_pin: 32
-    # UART connected to USB port:
-    #    tx_pin: GPIO1
-    #    rx_pin: GPIO3
+    parity: NONE
+    stop_bits: 2
+    tx_pin: GPIO21
+    rx_pin: GPIO20
+
+  # UART for Haier air conditioner communication
+  - id: haier_uart
+    baud_rate: 9600
+    parity: NONE
+    stop_bits: 1
+    tx_pin: GPIO5
+    rx_pin: GPIO4
+
 
 # Modbus server configuration
 modbus:
   - uart_id: modbus_uart
     id: modbus_server
     role: server
-    flow_control_pin: GPIO25
+    flow_control_pin: GPIO18
 
-status_led:
-  pin: GPIO1
+# status_led:
+#   pin: GPIO12
 
 logger:
   baud_rate: 0
@@ -290,6 +292,7 @@ select:
       - "Boost"
       - "Comfort"
     optimistic: false
+    update_interval: 1s
     lambda: |-
       switch (id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE)) {
         case CLIMATE_PRESET_AWAY: return std::string("Away");
@@ -320,6 +323,7 @@ select:
       - "Medium"
       - "High"
     optimistic: false
+    update_interval: 1s
     lambda: |-
       switch (id(haier_ac).fan_mode.value_or(CLIMATE_FAN_AUTO)) {
         case CLIMATE_FAN_LOW: return std::string("Low");
@@ -350,6 +354,7 @@ select:
       - "Horizontal"
       - "Both"
     optimistic: false
+    update_interval: 1s
     lambda: |-
       switch (id(haier_ac).swing_mode) {
         case CLIMATE_SWING_VERTICAL: return std::string("Vertical");
@@ -465,7 +470,7 @@ binary_sensor:
     icon: "mdi:gesture-tap-button"
     internal: true
     pin: 
-      number: GPIO0
+      number: GPIO09
       mode: INPUT_PULLUP
       inverted: true
     on_click:
@@ -542,20 +547,22 @@ sensor:
     entity_category: diagnostic
 
   - platform: template
-    name: "[Modbus Holding 3] Current temperature (without correction)"
+    name: "[Modbus Holding 3] Current temperature (with correction)"
     icon: "mdi:thermometer"
     lambda: |-
-      return id(haier_ac).current_temperature;
+      return id(haier_ac).current_temperature + id(modbus_temperature_correction_number).state;
     unit_of_measurement: "°C"
     accuracy_decimals: 1
+    update_interval: 1s
 
   - platform: template
-    name: "[Modbus Holding 5] Target temperature (without correction)"
+    name: "[Modbus Holding 5] Target temperature (with correction)"
     icon: "mdi:thermometer-chevron-up"
     lambda: |-
-      return id(haier_ac).target_temperature;
+      return id(haier_ac).target_temperature + id(modbus_temperature_correction_number).state;
     unit_of_measurement: "°C"
     accuracy_decimals: 1
+    update_interval: 1s
 
   - platform: uptime
     id: uptime_sensor
@@ -574,7 +581,7 @@ sensor:
   - platform: template
     name: "Free Heap"
     icon: "mdi:memory"
-    lambda: return ESP.getFreeHeap();
+    lambda: return esp_get_free_heap_size();
     unit_of_measurement: "bytes"
     update_interval: 60s
     entity_category: diagnostic
