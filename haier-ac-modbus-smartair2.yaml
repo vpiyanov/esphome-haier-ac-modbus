@@ -1,8 +1,3 @@
-# NOTE: Right now stable EspHome does not support Coil registers for ModBus server. Use custom branch:
-external_components:
-  - source: github://gotnone/esphome@server_coil_hybrid
-    components: [modbus, modbus_controller]
-
 # Configure your board and used pins below:
 esp32:
   board: esp32-c3-devkitm-1
@@ -16,6 +11,11 @@ substitutions:
   modbus_uart_rx_pin: GPIO20
   modbus_flow_control_pin: GPIO18
   boot_button_pin: GPIO9
+
+# NOTE: Right now stable EspHome does not support Coil registers for ModBus server. Use custom branch:
+external_components:
+  - source: github://gotnone/esphome@server_coil_hybrid
+    components: [modbus, modbus_controller]
 
 esphome:
   name: haier-ac-modbus-smartair2
