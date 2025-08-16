@@ -3,6 +3,20 @@ external_components:
   - source: github://gotnone/esphome@server_coil_hybrid
     components: [modbus, modbus_controller]
 
+# Configure your board and used pins below:
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+substitutions:
+  haier_uart_tx_pin: GPIO5
+  haier_uart_rx_pin: GPIO4
+  modbus_uart_tx_pin: GPIO21
+  modbus_uart_rx_pin: GPIO20
+  modbus_flow_control_pin: GPIO18
+  boot_button_pin: GPIO9
+
 esphome:
   name: haier-ac-modbus-smartair2
   friendly_name: "Haier AC Modbus Adapter"
@@ -55,11 +69,6 @@ esphome:
           ESP_LOGI("boot", "Setting send WiFi status to AC to: %s", send_wifi_status ? "ON" : "OFF");
           id(haier_ac).set_send_wifi(send_wifi_status);
 
-esp32:
-  board: esp32-c3-devkitm-1
-  framework:
-    type: esp-idf
-
 # Enable Home Assistant API
 api:
   encryption:
@@ -87,27 +96,23 @@ uart:
     baud_rate: 9600
     parity: NONE
     stop_bits: 2
-    tx_pin: GPIO21
-    rx_pin: GPIO20
+    tx_pin: ${modbus_uart_tx_pin}
+    rx_pin: ${modbus_uart_rx_pin}
 
   # UART for Haier air conditioner communication
   - id: haier_uart
     baud_rate: 9600
     parity: NONE
     stop_bits: 1
-    tx_pin: GPIO5
-    rx_pin: GPIO4
-
+    tx_pin: ${haier_uart_tx_pin}
+    rx_pin: ${haier_uart_rx_pin}
 
 # Modbus server configuration
 modbus:
   - uart_id: modbus_uart
     id: modbus_server
     role: server
-    flow_control_pin: GPIO18
-
-# status_led:
-#   pin: GPIO12
+    flow_control_pin: ${modbus_flow_control_pin}
 
 logger:
   baud_rate: 0
@@ -470,7 +475,7 @@ binary_sensor:
     icon: "mdi:gesture-tap-button"
     internal: true
     pin: 
-      number: GPIO09
+      number: ${boot_button_pin}
       mode: INPUT_PULLUP
       inverted: true
     on_click:
