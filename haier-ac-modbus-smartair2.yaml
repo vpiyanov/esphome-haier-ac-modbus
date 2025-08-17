@@ -661,7 +661,7 @@ modbus_controller:
         value_type: COIL
         read_lambda: |-
           ESP_LOGD("modbus_coil_5", "Read Beeper state: OFF (not supported)");
-          return 0;
+          return 1;
 
       # Coil 6: Eco mode (NOTE: Not supported by haier-esphome)
       - address: 6
@@ -1038,7 +1038,7 @@ modbus_controller:
 
       # Holding 104 - Uptime
       - address: 104
-        value_type: U_WORD
+        value_type: U_DWORD
         read_lambda: |-
           int result = (int)id(uptime_sensor).state;
           ESP_LOGD("modbus_holding_104", "Read Uptime: %d seconds", result);
@@ -1134,42 +1134,42 @@ modbus_controller:
 
       # Holding 200 - HW Version
       - address: 200
-        value_type: U_WORD
+        value_type: U_DWORD
         read_lambda: |-
           ESP_LOGD("modbus_holding_200", "Read HW Version: 0");
           return 0;
 
-      # Holding 201 - HW Version
+      # Holding 201 - HW Version 2
       - address: 201
-        value_type: U_WORD
+        value_type: U_DWORD
         read_lambda: |-
           ESP_LOGD("modbus_holding_201", "Read HW Version: 0");
           return 0;
 
       # Holding 250 - FW Version
       - address: 250
-        value_type: U_WORD
+        value_type: U_DWORD
         read_lambda: |-
           ESP_LOGD("modbus_holding_250", "Read FW Version: 0");
           return 0;
 
       # Holding 270 - Serial
       - address: 270
-        value_type: U_WORD
+        value_type: U_DWORD
         read_lambda: |-
           ESP_LOGD("modbus_holding_270", "Read Serial: 0");
           return 0;
 
       # Input 290 - Signature
       - address: 290
-        value_type: U_WORD
+        value_type: U_DWORD
         read_lambda: |-
           ESP_LOGD("modbus_input_290", "Read Signature: 0");
           return 0;
 
       # Input 400 - PROTO Version
       - address: 400
-        value_type: U_WORD
+        value_type: U_DWORD
         read_lambda: |-
           ESP_LOGD("modbus_input_400", "Read PROTO Version: 0");
           return 0;
