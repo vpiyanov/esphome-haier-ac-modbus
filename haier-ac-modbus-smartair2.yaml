@@ -14,7 +14,7 @@ substitutions:
   haier_uart_rx_pin: GPIO4
   modbus_uart_tx_pin: GPIO21
   modbus_uart_rx_pin: GPIO20
-  modbus_flow_control_pin: GPIO18
+  modbus_flow_control_pin: GPIO1
   boot_button_pin: GPIO9
 
 esphome:
