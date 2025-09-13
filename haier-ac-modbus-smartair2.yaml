@@ -672,11 +672,15 @@ modbus_controller:
         value_type: COIL
         read_lambda: |-
           bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_COMFORT;
-          ESP_LOGD("modbus_coil_3", "Read Quiet mode state: %s", result ? "ON" : "OFF");
+          ESP_LOGD("modbus_coil_4", "Read Quiet mode state: %s", result ? "ON" : "OFF");
           return result;
         write_lambda: |-
-          ESP_LOGI("modbus_coil_3", "Write Quiet mode state: ON");
-          id(haier_ac).make_call().set_preset(CLIMATE_PRESET_COMFORT).perform();
+          ESP_LOGI("modbus_coil_4", "Write Quiet mode state: %s", x ? "ON" : "OFF");
+          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_COMFORT) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_COMFORT).perform();  
+          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_COMFORT) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
+          }
           return true;
 
       # Coil 5: Beeper (NOTE: Not supported in SMARTAIR2)
@@ -701,11 +705,15 @@ modbus_controller:
           ESP_LOGD("modbus_coil_7", "Read Turbo mode state: %s", result ? "ON" : "OFF");
           return result;
         write_lambda: |-
-          ESP_LOGI("modbus_coil_7", "Write Turbo mode state: ON");
-          id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();
+          ESP_LOGI("modbus_coil_7", "Write Turbo mode state: %s", x ? "ON" : "OFF");
+          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_BOOST) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();  
+          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
+          }
           return true;
 
-      # Coil 8: Sleep mode (NOTE: Not supported by haier-esphome)
+      # Coil 8: Sleep mode (NOTE: Not supported by SMARTAIR2)
       - address: 8
         value_type: COIL
         read_lambda: |-
@@ -1219,10 +1227,10 @@ modbus_controller:
           return result;
         write_lambda: |-
           ESP_LOGI("modbus_coil_1001", "Write Away mode state: %s", x ? "ON" : "OFF");
-          if (x) {
-            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();
-          } else {
-            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();
+          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_AWAY) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();  
+          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
           }
           return true;
 
