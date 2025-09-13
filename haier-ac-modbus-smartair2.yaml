@@ -281,7 +281,7 @@ button:
     
   - platform: factory_reset
     id: factory_reset_button
-    name: "[Modbus Coil 1000] Adapter factory reset"
+    name: "[Modbus Holding 1000] Adapter factory reset"
     icon: "mdi:factory"
     entity_category: config
     web_server:
@@ -609,6 +609,26 @@ text_sensor:
     dns_address:
       name: WiFi DNS Address
       icon: "mdi:wifi"
+
+script:
+  - id: delayed_restart_script
+    mode: single
+    then:
+      - logger.log:
+          level: WARN
+          format: "Restart scheduled..."
+      - delay: 1s
+      - button.press: restart_button
+
+  - id: delayed_reset_script
+    mode: single
+    then:
+      - logger.log:
+          level: WARN
+          format: "Factory reset scheduled..."
+      - delay: 1s
+      - button.press: factory_reset_button
+
 
 # Modbus controller with server registers based on ONOKOM-AIR-HR-1-MB-B specification
 modbus_controller:
@@ -1102,7 +1122,8 @@ modbus_controller:
         write_lambda: |-
           ESP_LOGI("modbus_holding_120", "Write Reboot device: %d", x);
           if (x) {
-            id(restart_button).press();
+            // Schedule asynchronous restart - after modbus response is sent:
+            id(delayed_restart_script).execute();
           }
           return true;
       # Holding 128 - Modbus Address
@@ -1186,7 +1207,8 @@ modbus_controller:
         write_lambda: |-
           ESP_LOGI("modbus_holding_1000", "Write Factory reset: %d", x);
           if (x) {
-            id(factory_reset_button).press();
+            // Schedule asynchronous reset - after modbus response is sent:
+            id(delayed_reset_script).execute();
           }
           return true;
 
