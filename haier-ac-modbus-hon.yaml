@@ -1,0 +1,1252 @@
+# NOTE: Right now stable EspHome does not support Coil registers for ModBus server. Use custom branch:
+external_components:
+  - source: github://gotnone/esphome@server_coil_hybrid
+    components: [modbus, modbus_controller]
+
+# Configure your board and used pins below:
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+substitutions:
+  haier_uart_tx_pin: GPIO5
+  haier_uart_rx_pin: GPIO4
+  modbus_uart_tx_pin: GPIO21
+  modbus_uart_rx_pin: GPIO20
+  modbus_flow_control_pin: GPIO1
+  boot_button_pin: GPIO9
+
+esphome:
+  name: haier-ac-modbus
+  friendly_name: "Haier AC Modbus Adapter"
+  project:
+    name: "vpiyanov.haier-ac-modbus-hon"
+    version: "1.0"
+  # Automatically add the mac address to the name, so you can use a single firmware for all devices:
+  # name_add_mac_suffix: true
+  on_boot:
+    priority: -100  # Run after all components are initialized
+    then:
+      - lambda: |-
+          // Apply the restored modbus address
+          int address = id(modbus_address_number).state;
+          ESP_LOGI("boot", "Setting Modbus address to: %d", address);
+          id(modbus_controller_server).set_address(address);
+          
+          // Apply restored UART settings
+          uint32_t baud_rate = std::stoul(id(modbus_baud_rate).state);
+          UARTParityOptions parity = UART_CONFIG_PARITY_NONE;
+          if (id(modbus_parity_bit).state == "Odd") {
+            parity = UART_CONFIG_PARITY_ODD;
+          } else if (id(modbus_parity_bit).state == "Even") {
+            parity = UART_CONFIG_PARITY_EVEN;
+          }
+          uint32_t stop_bits = std::stoul(id(modbus_stop_bits).state);
+
+          ESP_LOGI("boot", "Applying UART configuration: baud=%d, parity=%d, stop_bits=%d", baud_rate, parity, stop_bits);
+          id(modbus_uart).flush();
+          id(modbus_uart).set_baud_rate(baud_rate);
+          id(modbus_uart).set_parity(parity);
+          id(modbus_uart).set_stop_bits(stop_bits);
+          id(modbus_uart).load_settings();
+          ESP_LOGI("boot", "UART configuration applied successfully");
+
+          // Apply restored WiFi enable state
+          bool wifi_enabled = id(wifi_enable_switch).state;
+          ESP_LOGI("boot", "Setting WiFi state to: %s", wifi_enabled ? "ENABLED" : "DISABLED");
+          if (wifi_enabled) {
+            wifi::global_wifi_component->enable();
+          } else {
+            wifi::global_wifi_component->disable();
+          }
+
+          // Apply restored send WiFi status to AC setting
+          bool send_wifi_status = id(send_wifi_status_to_ac).state;
+          ESP_LOGI("boot", "Setting send WiFi status to AC to: %s", send_wifi_status ? "ON" : "OFF");
+          id(haier_ac).set_send_wifi(send_wifi_status);
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  id: wifi_component
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Haier AC Modbus Adapter"
+    password: ""
+
+# UART configuration
+uart:
+  # UART for Modbus server communication
+  - id: modbus_uart
+    baud_rate: 9600
+    parity: NONE
+    stop_bits: 2
+    tx_pin: ${modbus_uart_tx_pin}
+    rx_pin: ${modbus_uart_rx_pin}
+
+  # UART for Haier air conditioner communication
+  - id: haier_uart
+    baud_rate: 9600
+    parity: NONE
+    stop_bits: 1
+    tx_pin: ${haier_uart_tx_pin}
+    rx_pin: ${haier_uart_rx_pin}
+
+# Modbus server configuration
+modbus:
+  - uart_id: modbus_uart
+    id: modbus_server
+    role: server
+    flow_control_pin: ${modbus_flow_control_pin}
+
+logger:
+  baud_rate: 0
+  level: INFO
+  logs:
+    modbus_controller.server: WARN
+    sensor: WARN
+    switch: WARN
+
+web_server:
+  version: 3
+  local: true
+  sorting_groups:
+    - id: ac_configuration
+      name: "AC Configuration"
+      sorting_weight: 0
+
+captive_portal:
+
+
+# Haier climate component
+climate:
+  - platform: haier
+    id: haier_ac
+    name: "[Modbus Coil 1, Holding 1,2] Climate Mode"
+    icon: "mdi:air-conditioner"
+    uart_id: haier_uart
+    protocol: HON
+    wifi_signal: true
+    display: true
+    supported_modes:
+      - "OFF"
+      - "HEAT_COOL"
+      - "COOL"
+      - "HEAT"
+      - "DRY"
+      - "FAN_ONLY"
+    supported_swing_modes:
+      - "OFF"
+      - "VERTICAL"
+      - "HORIZONTAL"
+      - "BOTH"
+    supported_presets:
+      - "AWAY"
+      - "BOOST"
+      - "SLEEP"
+
+
+# Switches for additional Haier features
+switch:
+  - platform: haier
+    health_mode:
+      name: "[Modbus Coil 9] Ionization/Health mode"
+      icon: "mdi:air-filter"
+    display:
+      name: "[Modbus Coil 2] Screen light"
+      icon: "mdi:monitor"
+      web_server:
+        sorting_group_id: ac_configuration
+
+  # Used to store Modbus register values:
+  - platform: template
+    id: modbus_show_fan_as_range
+    name: "[Modbus Coil 92] Show fan as range"
+    icon: "mdi:fan"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+    web_server:
+      sorting_weight: 80
+
+  - platform: template
+    id: modbus_show_vanes_as_range
+    name: "[Modbus Coil 93] Show vanes as range"
+    icon: "mdi:arrow-oscillating"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+    web_server:
+      sorting_weight: 81
+
+  - platform: template
+    id: modbus_show_thermostat_state_as_range
+    name: "[Modbus Coil 94] Show thermostat state as range"
+    icon: "mdi:thermometer"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+    web_server:
+      sorting_weight: 82
+
+  - platform: template
+    id: modbus_show_modes_as_range
+    name: "[Modbus Coil 95] Show modes as range"
+    icon: "mdi:format-list-bulleted"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+    web_server:
+      sorting_weight: 83
+
+  - platform: template
+    id: modbus_allow_the_use_of_an_external_temperature_sensor
+    name: "[Modbus Coil 100] Allow the use of an external temperature sensor"
+    icon: "mdi:thermometer-plus"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+    web_server:
+      sorting_weight: 20
+
+  - platform: template
+    id: wifi_enable_switch
+    name: "[Modbus Coil 1003] Adapter WiFi Enable"
+    icon: "mdi:wifi"
+    restore_mode: RESTORE_DEFAULT_ON
+    optimistic: true
+    entity_category: config
+    web_server:
+      sorting_weight: 5
+    turn_on_action:
+      - wifi.enable:
+      - logger.log: "WiFi enabled"
+    turn_off_action:
+      - wifi.disable:
+      - logger.log: "WiFi disabled"
+
+  - platform: template
+    id: send_wifi_status_to_ac
+    name: "[Modbus Coil 1004] Send WiFi status to AC"
+    icon: "mdi:wifi-sync"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    entity_category: config
+    web_server:
+      sorting_group_id: ac_configuration
+    turn_on_action:
+      - lambda: id(haier_ac).set_send_wifi(true);
+    turn_off_action:
+      - lambda: id(haier_ac).set_send_wifi(false);
+
+button:
+  - platform: restart
+    id: restart_button
+    name: "[Modbus Holding 120] Restart adapter"
+    icon: "mdi:restart"
+    entity_category: config
+    web_server:
+      sorting_weight: 100
+    
+  - platform: factory_reset
+    id: factory_reset_button
+    name: "[Modbus Holding 1000] Adapter factory reset"
+    icon: "mdi:factory"
+    entity_category: config
+    web_server:
+      sorting_weight: 110
+
+select:
+  - id: haier_preset_select
+    name: "[Modbus Coils 7, 8, 1001 and Holding 8] Preset"
+    icon: "mdi:tune"
+    platform: template
+    options:
+      - "None"
+      - "Away"
+      - "Boost"
+      - "Sleep"
+    optimistic: false
+    update_interval: 1s
+    lambda: |-
+      switch (id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE)) {
+        case CLIMATE_PRESET_AWAY: return std::string("Away");
+        case CLIMATE_PRESET_BOOST: return std::string("Boost");
+        case CLIMATE_PRESET_SLEEP: return std::string("Sleep");
+        default: return std::string("None");
+      }
+    set_action:
+      - lambda: |-
+          ESP_LOGI("haier_preset", "Setting preset to: %s", x.c_str());
+          if (x == "Away") {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();
+          } else if (x == "Boost") {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();
+          } else if (x == "Sleep") {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_SLEEP).perform();
+          } else {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();
+          }
+
+  - id: haier_fan_mode_select
+    name: "[Modbus Holding 7] Fan mode"
+    icon: "mdi:fan"
+    platform: template
+    options:
+      - "Auto"
+      - "Low"
+      - "Medium"
+      - "High"
+    optimistic: false
+    update_interval: 1s
+    lambda: |-
+      switch (id(haier_ac).fan_mode.value_or(CLIMATE_FAN_AUTO)) {
+        case CLIMATE_FAN_LOW: return std::string("Low");
+        case CLIMATE_FAN_MEDIUM: return std::string("Medium");
+        case CLIMATE_FAN_HIGH: return std::string("High");
+        default: return std::string("Auto");
+      }
+    set_action:
+      - lambda: |-
+          ESP_LOGI("haier_fan_mode", "Setting fan mode to: %s", x.c_str());
+          if (x == "Low") {
+            id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_LOW).perform();
+          } else if (x == "Medium") {
+            id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_MEDIUM).perform();
+          } else if (x == "High") {
+            id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_HIGH).perform();
+          } else {
+            id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform();
+          }
+
+  - id: haier_swing_mode_select
+    name: "[Modbus Holding 11] Swing mode"
+    icon: "mdi:arrow-oscillating"
+    platform: template
+    options:
+      - "Off"
+      - "Vertical"
+      - "Horizontal"
+      - "Both"
+    optimistic: false
+    update_interval: 1s
+    lambda: |-
+      switch (id(haier_ac).swing_mode) {
+        case CLIMATE_SWING_VERTICAL: return std::string("Vertical");
+        case CLIMATE_SWING_HORIZONTAL: return std::string("Horizontal");
+        case CLIMATE_SWING_BOTH: return std::string("Both");
+        default: return std::string("Off");
+      }
+    set_action:
+      - lambda: |-
+          ESP_LOGI("haier_swing_mode", "Setting swing mode to: %s", x.c_str());
+          if (x == "Vertical") {
+            id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_VERTICAL).perform();
+          } else if (x == "Horizontal") {
+            id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_HORIZONTAL).perform();
+          } else if (x == "Both") {
+            id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_BOTH).perform();
+          } else {
+            id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_OFF).perform();
+          }
+
+  - id: modbus_baud_rate
+    name: "[Modbus Holding 110] Baud rate"
+    icon: "mdi:speedometer"
+    platform: template
+    options:
+      - "2400"
+      - "9600"
+      - "38400"
+      - "57600"
+      - "115200"
+      - "256000"
+      - "512000"
+      - "921600"
+    initial_option: "9600"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_weight: 11
+    set_action:
+      - lambda: |-
+          uint32_t new_baud_rate = std::stoul(x);
+          ESP_LOGD("modbus_baud_rate", "Changing baud rate from %i to %i", id(modbus_uart).get_baud_rate(), new_baud_rate);
+          if (id(modbus_uart).get_baud_rate() != new_baud_rate) {
+            id(modbus_uart).flush();
+            id(modbus_uart).set_baud_rate(new_baud_rate);
+            id(modbus_uart).load_settings();
+          }
+
+  - id: modbus_parity_bit
+    name: "[Modbus Holding 111] Parity bit"
+    icon: "mdi:check-circle"
+    platform: template
+    options:
+      - "None"
+      - "Odd"
+      - "Even"
+    initial_option: "None"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_weight: 12
+    set_action:
+      - lambda: |-
+          UARTParityOptions new_parity = UART_CONFIG_PARITY_NONE;
+          if (x == "Odd") {
+            new_parity = UART_CONFIG_PARITY_ODD;
+          } else if (x == "Even") {
+            new_parity = UART_CONFIG_PARITY_EVEN;
+          }
+          ESP_LOGD("modbus_parity", "Changing parity from %i to %i", id(modbus_uart).get_parity(), new_parity);
+          if (id(modbus_uart).get_parity() != new_parity) {
+            id(modbus_uart).flush();
+            id(modbus_uart).set_parity(new_parity);
+            id(modbus_uart).load_settings();
+          }
+
+  - id: modbus_stop_bits
+    name: "[Modbus Holding 112] Stop bits"
+    icon: "mdi:stop-circle"
+    platform: template
+    options:
+      - "1"
+      - "2"
+    initial_option: "2"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    web_server:
+      sorting_weight: 13
+    set_action:
+      - lambda: |-
+          uint32_t new_stop_bits = std::stoul(x);
+          ESP_LOGD("modbus_stop_bits", "Changing stop bits from %i to %i",id(modbus_uart).get_stop_bits(), new_stop_bits);
+          if (id(modbus_uart).get_stop_bits() != new_stop_bits) {
+            id(modbus_uart).flush();
+            id(modbus_uart).set_stop_bits(new_stop_bits);
+            id(modbus_uart).load_settings();
+          }
+
+binary_sensor:
+  - platform: template
+    id: haier_connected_sensor
+    name: "[Modbus Coil 20] AC connected"
+    icon: "mdi:connection"
+    lambda: |-
+      return id(haier_ac).valid_connection();
+
+  - platform: gpio
+    id: boot_button
+    name: "Boot Button"
+    icon: "mdi:gesture-tap-button"
+    internal: true
+    pin: 
+      number: ${boot_button_pin}
+      mode: INPUT_PULLUP
+      inverted: true
+    on_click:
+      - min_length: 50ms
+        max_length: 5s
+        then: # Short click action:
+          - switch.toggle: wifi_enable_switch
+          - logger.log: "Boot button short press - WiFi toggled"
+  - platform: template
+    id: boot_button_longpress
+    name: "Boot Button Long Press"
+    icon: "mdi:gesture-tap-hold"
+    internal: true
+    condition:
+      binary_sensor.is_on: boot_button
+    filters:
+      - delayed_on: 10s
+    on_press: # Long press action:
+        then:
+          - logger.log: "Factory reset initiated - Long press detected (10+ seconds)"
+          - logger.log:
+              level: WARN
+              tag: "factory_reset"
+              format: "Performing factory reset - all settings will be cleared!"
+          - delay: 10s
+          - button.press: factory_reset_button
+
+number:
+  # Used to store Modbus register values:
+  - platform: template
+    id: modbus_temperature_correction_number
+    name: "[Modbus Holding 14] Temperature correction for Modbus"
+    icon: "mdi:thermometer-plus"
+    min_value: -5
+    max_value: 5
+    initial_value: 0.0
+    step: 0.1
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: "°C"
+    entity_category: config
+    web_server:
+      sorting_weight: 21
+
+  - platform: template
+    id: modbus_address_number
+    name: "[Modbus Holding 128] Modbus address"
+    icon: "mdi:identifier"
+    min_value: 1
+    max_value: 247
+    initial_value: 1
+    step: 1
+    restore_value: true
+    optimistic: true
+    mode: box
+    entity_category: config
+    web_server:
+      sorting_weight: 10
+    set_action:
+      - lambda: |-
+          int address = x;
+          ESP_LOGI("modbus_address", "Changing Modbus address to %d", address);
+          id(modbus_controller_server).set_address(address);
+          ESP_LOGI("modbus_address", "Modbus address successfully changed to %d", address);
+
+# Additional sensors for monitoring
+sensor:
+  - platform: internal_temperature
+    id: mcu_temperature_sensor
+    name: "[Modbus Input 124] MCU temperature"
+    icon: "mdi:thermometer"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+
+  - platform: template
+    name: "[Modbus Holding 3] Current temperature (with correction)"
+    icon: "mdi:thermometer"
+    lambda: |-
+      return id(haier_ac).current_temperature + id(modbus_temperature_correction_number).state;
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    update_interval: 1s
+
+  - platform: template
+    name: "[Modbus Holding 5] Target temperature (with correction)"
+    icon: "mdi:thermometer-chevron-up"
+    lambda: |-
+      return id(haier_ac).target_temperature + id(modbus_temperature_correction_number).state;
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    update_interval: 1s
+
+  - platform: uptime
+    id: uptime_sensor
+    name: "[Modbus Holding 104] Uptime"
+    icon: "mdi:clock-outline"
+    type: seconds
+    entity_category: diagnostic
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    icon: "mdi:wifi"
+    update_interval: 60s
+    entity_category: diagnostic
+
+  # Memory monitoring
+  - platform: template
+    name: "Free Heap"
+    icon: "mdi:memory"
+    lambda: return esp_get_free_heap_size();
+    unit_of_measurement: "bytes"
+    update_interval: 60s
+    entity_category: diagnostic
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: WiFi IP Address
+      icon: "mdi:wifi"
+    ssid:
+      name: WiFi Connected SSID
+      icon: "mdi:wifi"
+    bssid:
+      name: WiFi Connected BSSID
+      icon: "mdi:wifi"
+    mac_address:
+      name: WiFi Mac Address
+      icon: "mdi:wifi"
+    dns_address:
+      name: WiFi DNS Address
+      icon: "mdi:wifi"
+
+script:
+  - id: delayed_restart_script
+    mode: single
+    then:
+      - logger.log:
+          level: WARN
+          format: "Restart scheduled..."
+      - delay: 1s
+      - button.press: restart_button
+
+  - id: delayed_reset_script
+    mode: single
+    then:
+      - logger.log:
+          level: WARN
+          format: "Factory reset scheduled..."
+      - delay: 1s
+      - button.press: factory_reset_button
+
+
+# Modbus controller with server registers based on ONOKOM-AIR-HR-1-MB-B specification
+modbus_controller:
+  - modbus_id: modbus_server
+    id: modbus_controller_server
+    address: 1
+    server_registers:
+
+      # Coil 1: Active
+      - address: 1
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).mode != CLIMATE_MODE_OFF;
+          ESP_LOGD("modbus_coil_1", "Read Active state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_1", "Write Active state: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(haier_ac).send_power_on_command();
+          } else {
+            id(haier_ac).send_power_off_command();
+          }
+          return true;
+
+      # Coil 2: Screen light
+      - address: 2
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).get_display_state();
+          ESP_LOGD("modbus_coil_2", "Read Screen light state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_2", "Write Screen light state: %s", x ? "ON" : "OFF");
+          id(haier_ac).set_display_state(x);
+          return true;
+
+      # Coil 4: Quiet mode
+      - address: 4
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).get_quiet_mode_state();
+          ESP_LOGD("modbus_coil_4", "Read Quiet mode state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_4", "Write Quiet mode state: ON");
+          id(haier_ac).set_quiet_mode_state(x);
+          return true;
+
+      # Coil 5: Beeper (NOTE: Not supported in SMARTAIR2)
+      - address: 5
+        value_type: COIL
+        read_lambda: |-
+          ESP_LOGD("modbus_coil_5", "Read Beeper state: OFF (not supported)");
+          return 1;
+
+      # Coil 6: Eco mode (NOTE: Not supported by haier-esphome)
+      - address: 6
+        value_type: COIL
+        read_lambda: |-
+          ESP_LOGD("modbus_coil_6", "Read Eco state: OFF (not supported)");
+          return 0;
+
+      # Coil 7: Turbo mode
+      - address: 7
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST;
+          ESP_LOGD("modbus_coil_7", "Read Turbo mode state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_7", "Write Turbo mode state: %s", x ? "ON" : "OFF");
+          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_BOOST) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();  
+          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
+          }
+          return true;
+
+      # Coil 8: Sleep mode
+      - address: 8
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_SLEEP;
+          ESP_LOGD("modbus_coil_8", "Read Sleep mode state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_8", "Write Sleep mode state: %s", x ? "ON" : "OFF");
+          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_SLEEP) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_SLEEP).perform();  
+          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_SLEEP) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
+          }
+          return true;
+
+      # Coil 9: Ionization/Health mode
+      - address: 9
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).get_health_mode();
+          ESP_LOGD("modbus_coil_9", "Read Health mode state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_9", "Write Health mode state: %s", x ? "ON" : "OFF");
+          id(haier_ac).set_health_mode(x);
+          return true;        
+
+      # Coil 10: Self cleaning (NOTE: Not supported in SMARTAIR2)
+      - address: 10
+        value_type: COIL
+        read_lambda: |-
+          ESP_LOGD("modbus_coil_10", "Read Self cleaning state: OFF (not supported)");
+          return 0;
+
+      # Coil 20: AC connected
+      - address: 20
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).valid_connection();
+          ESP_LOGD("modbus_coil_20", "Read AC connected state: %s", result ? "CONNECTED" : "DISCONNECTED");
+          return result;
+
+      # Coil 92: Show fan as range
+      - address: 92
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(modbus_show_fan_as_range).state;
+          ESP_LOGD("modbus_coil_92", "Read Show fan as range: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_92", "Write Show fan as range: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(modbus_show_fan_as_range).turn_on();
+          } else {
+            id(modbus_show_fan_as_range).turn_off();
+          }
+          return true;
+
+      # Coil 93: Show vanes as range
+      - address: 93
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(modbus_show_vanes_as_range).state;
+          ESP_LOGD("modbus_coil_93", "Read Show vanes as range: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_93", "Write Show vanes as range: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(modbus_show_vanes_as_range).turn_on();
+          } else {
+            id(modbus_show_vanes_as_range).turn_off();
+          }
+          return true;
+
+      # Coil 94: Show thermostat as range
+      - address: 94
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(modbus_show_thermostat_state_as_range).state;
+          ESP_LOGD("modbus_coil_94", "Read Show thermostat as range: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_94", "Write Show thermostat as range: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(modbus_show_thermostat_state_as_range).turn_on();
+          } else {
+            id(modbus_show_thermostat_state_as_range).turn_off();
+          }
+          return true;
+
+      # Coil 95: Show modes as range
+      - address: 95
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(modbus_show_modes_as_range).state;
+          ESP_LOGD("modbus_coil_95", "Read Show modes as range: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_95", "Write Show modes as range: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(modbus_show_modes_as_range).turn_on();
+          } else {
+            id(modbus_show_modes_as_range).turn_off();
+          }
+          return true;
+
+      # Coil 100: Allow the use of an external temperature sensor
+      - address: 100
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(modbus_allow_the_use_of_an_external_temperature_sensor).state;
+          ESP_LOGD("modbus_coil_100", "Read Allow the use of an external temperature sensor: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_100", "Write Allow the use of an external temperature sensor: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(modbus_allow_the_use_of_an_external_temperature_sensor).turn_on();
+          } else {
+            id(modbus_allow_the_use_of_an_external_temperature_sensor).turn_off();
+          }
+          return true;
+
+      # Holding 1 - Mode
+      - address: 1
+        value_type: U_WORD
+        read_lambda: |-
+          int result;
+          switch (id(haier_ac).mode) {
+            case CLIMATE_MODE_HEAT: result = 1; break;
+            case CLIMATE_MODE_COOL: result = 2; break;
+            case CLIMATE_MODE_HEAT_COOL: result = 3; break;
+            case CLIMATE_MODE_DRY: result = 4; break;
+            case CLIMATE_MODE_FAN_ONLY: result = 5; break;
+            default: result = 0;
+          }
+          ESP_LOGD("modbus_holding_1", "Read Mode: %d", result);
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_1", "Write Mode: %d", x);
+          switch (x) {
+            case 1: id(haier_ac).make_call().set_mode(CLIMATE_MODE_HEAT).perform(); return true;
+            case 2: id(haier_ac).make_call().set_mode(CLIMATE_MODE_COOL).perform(); return true;
+            case 3: id(haier_ac).make_call().set_mode(CLIMATE_MODE_HEAT_COOL).perform(); return true;
+            case 4: id(haier_ac).make_call().set_mode(CLIMATE_MODE_DRY).perform(); return true;
+            case 5: id(haier_ac).make_call().set_mode(CLIMATE_MODE_FAN_ONLY).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 2 - Active mode
+      - address: 2
+        value_type: U_WORD
+        read_lambda: |-
+          int result;
+          switch (id(haier_ac).mode) {
+            case CLIMATE_MODE_OFF: result = 0; break;
+            case CLIMATE_MODE_HEAT: result = 1; break;
+            case CLIMATE_MODE_COOL: result = 2; break;
+            case CLIMATE_MODE_HEAT_COOL: result = 3; break;
+            case CLIMATE_MODE_DRY: result = 4; break;
+            case CLIMATE_MODE_FAN_ONLY: result = 5; break;
+            default: result = 0;
+          }
+          ESP_LOGD("modbus_holding_2", "Read Active mode: %d", result);
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_2", "Write Active mode: %d", x);
+          switch (x) {
+            case 0: id(haier_ac).make_call().set_mode(CLIMATE_MODE_OFF).perform(); return true;
+            case 1: id(haier_ac).make_call().set_mode(CLIMATE_MODE_HEAT).perform(); return true;
+            case 2: id(haier_ac).make_call().set_mode(CLIMATE_MODE_COOL).perform(); return true;
+            case 3: id(haier_ac).make_call().set_mode(CLIMATE_MODE_HEAT_COOL).perform(); return true;
+            case 4: id(haier_ac).make_call().set_mode(CLIMATE_MODE_DRY).perform(); return true;
+            case 5: id(haier_ac).make_call().set_mode(CLIMATE_MODE_FAN_ONLY).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 3 - Indoor air temperature
+      - address: 3
+        value_type: S_WORD
+        read_lambda: |-
+          float ac_current_temp = id(haier_ac).current_temperature;
+          float correction = id(modbus_temperature_correction_number).state;
+          float external_current_temp = ac_current_temp + correction;
+          
+          int result = external_current_temp * 100; // Scale to 0.01 degree resolution          
+          ESP_LOGD("modbus_holding_3", "Read Indoor temperature: %.2f°C (raw: %d)", external_current_temp, result);
+          return result;
+        write_lambda: |-
+          if (id(modbus_allow_the_use_of_an_external_temperature_sensor).state) {
+            float ac_current_temp = id(haier_ac).current_temperature;
+            float ac_target_temp = id(haier_ac).target_temperature;
+
+            float current_correction = id(modbus_temperature_correction_number).state;
+            float external_current_temp = ((float)x) / 100.0;  // Convert from 0.01 scale
+            float external_target_temp = ac_target_temp + current_correction;
+
+            float new_correction = external_current_temp - ac_current_temp;
+            float new_ac_target_temp = external_target_temp - new_correction;
+            ESP_LOGD("modbus_holding_3", "Write Indoor air temperature: external_current_temp: %.2f°C (raw: %d), new_correction: %.2f°C, new_ac_target_temp:  %.2f°C", 
+              external_current_temp, x, new_correction, new_ac_target_temp);
+            id(modbus_temperature_correction_number).make_call().set_value(new_correction).perform();
+            id(haier_ac).make_call().set_target_temperature(new_ac_target_temp).perform();
+          }
+          return false;
+
+      # Holding 4 - Outdoor air temperature (NOTE: Not supported in SMARTAIR2)
+      - address: 4
+        value_type: S_WORD
+        read_lambda: |-
+          ESP_LOGD("modbus_holding_4", "Read Outdoor temperature: -32768 (not supported)");
+          return -32768;
+
+      # Holding 5 - Target temperature
+      - address: 5
+        value_type: S_WORD
+        read_lambda: |-
+          float ac_target_temp = id(haier_ac).target_temperature;
+          float correction = id(modbus_temperature_correction_number).state;
+          float external_target_temp = ac_target_temp + correction;
+          
+          int result = external_target_temp * 100;  // Scale to 0.01 degree resolution
+          ESP_LOGD("modbus_holding_5", "Read Target temperature: ac_target_temp: %.2f°C, external_target_temp: %.2f°C (raw: %d)", 
+            ac_target_temp, external_target_temp, result);
+          return result;
+        write_lambda: |-
+          float correction = id(modbus_temperature_correction_number).state;
+          float external_target_temp = ((float)x) / 100.0;  // Convert from 0.01 scale
+          float ac_target_temp = external_target_temp - correction;
+          
+          ESP_LOGI("modbus_holding_5", "Write Target temperature: external_target_temp: %.2f°C (raw: %d), ac_target_temp: %.2f°C", 
+            external_target_temp, x, ac_target_temp);
+          id(haier_ac).make_call().set_target_temperature(ac_target_temp).perform();
+          return true;
+
+      # Holding 6 - Thermostat state
+      - address: 6
+        value_type: U_WORD
+        read_lambda: |-          
+          float current_temp = id(haier_ac).current_temperature;
+          float target_temp = id(haier_ac).target_temperature;
+          ClimateMode mode = id(haier_ac).mode;
+          
+          int result = 0;  // Default to Idle
+          if ((mode == CLIMATE_MODE_HEAT || mode == CLIMATE_MODE_HEAT_COOL) && current_temp < target_temp) {
+            result = 1;  // Heating
+          } else if ((mode == CLIMATE_MODE_COOL || mode == CLIMATE_MODE_HEAT_COOL) && current_temp > target_temp) {
+            result = 2;  // Cooling
+          }
+          
+          ESP_LOGD("modbus_holding_6", "Read Thermostat state: %d (mode: %d, current: %.1f°C, target: %.1f°C)", 
+            result, (int)id(haier_ac).mode, current_temp, target_temp);
+          return result;
+
+      # Holding 7 - Fan speed
+      - address: 7
+        value_type: U_WORD
+        read_lambda: |-
+          int result;
+          switch (id(haier_ac).fan_mode.value_or(CLIMATE_FAN_AUTO)) {
+            case CLIMATE_FAN_AUTO: result = 0; break;
+            case CLIMATE_FAN_LOW: result = 1; break;
+            case CLIMATE_FAN_MEDIUM: result = 2; break;
+            case CLIMATE_FAN_HIGH: result = 3; break;
+            default: result = 0;
+          }
+          ESP_LOGD("modbus_holding_7", "Read Fan speed: %d", result);
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_7", "Write Fan speed: %d", x);
+          switch (x) {
+            case 0: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform(); return true;
+            case 1: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_LOW).perform(); return true;
+            case 2: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_MEDIUM).perform(); return true;
+            case 3: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_HIGH).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 8 - Smart fan speed
+      - address: 8
+        value_type: U_WORD
+        read_lambda: |-
+          int result;
+          if(id(haier_ac).get_quiet_mode_state()) {
+            result = 1;
+          }          
+          else if(id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST) {
+            result = 5;
+          }
+          else {
+            switch (id(haier_ac).fan_mode.value_or(CLIMATE_FAN_AUTO)) {
+              case CLIMATE_FAN_AUTO: result = 0; break;
+              case CLIMATE_FAN_LOW: result = 2; break;
+              case CLIMATE_FAN_MEDIUM: result = 3; break;
+              case CLIMATE_FAN_HIGH: result = 4; break;
+              default: result = 0;
+            }
+          }
+          ESP_LOGD("modbus_holding_8", "Read Smart fan speed: %d", result);
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_8", "Write Smart fan speed: %d", x);
+          switch (x) {
+            case 0: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_AUTO).perform(); return true;
+            case 1: id(haier_ac).set_quiet_mode_state(true); return true;
+            case 2: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_LOW).perform(); return true;
+            case 3: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_MEDIUM).perform(); return true;
+            case 4: id(haier_ac).make_call().set_fan_mode(CLIMATE_FAN_HIGH).perform(); return true;
+            case 5: id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 9 - Horizontal vanes (NOTE: Not supported in haier-esphome)
+      - address: 9
+        value_type: U_WORD
+        read_lambda: |-
+          ESP_LOGD("modbus_holding_9", "Read Horizontal vanes: 0 (not supported)");
+          return 0;
+
+      # Holding 10 - Vertical vanes (NOTE: Not supported in haier-esphome)
+      - address: 10
+        value_type: U_WORD
+        read_lambda: |-
+          ESP_LOGD("modbus_holding_10", "Read Vertical vanes: 0 (not supported)");
+          return 0;
+
+      # Holding 11 - Vanes swing
+      - address: 11
+        value_type: U_WORD
+        read_lambda: |-
+          int result;
+          switch (id(haier_ac).swing_mode) {
+            case CLIMATE_SWING_OFF: result = 0; break;
+            case CLIMATE_SWING_BOTH: result = 1; break;
+            case CLIMATE_SWING_HORIZONTAL: result = 2; break;
+            case CLIMATE_SWING_VERTICAL: result = 3; break;
+            default: result = 0;
+          }
+          ESP_LOGD("modbus_holding_11", "Read Vanes swing: %d", result);
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_11", "Write Vanes swing: %d", x);
+          switch (x) {
+            case 0: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_OFF).perform(); return true;
+            case 1: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_BOTH).perform(); return true;
+            case 2: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_HORIZONTAL).perform(); return true;
+            case 3: id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_VERTICAL).perform(); return true;
+            default: return false;
+          }
+
+      # Holding 14 - Temperature correction
+      - address: 14
+        value_type: S_WORD
+        read_lambda: |-
+          int result = id(modbus_temperature_correction_number).state * 100;  // Scale to 0.01 degree resolution
+          ESP_LOGD("modbus_holding_14", "Read Temperature correction: %.2f°C (raw: %d)", id(modbus_temperature_correction_number).state, result);
+          return result;
+        write_lambda: |-
+          float temp = ((float)x) / 100.0;  // Convert from 0.01 scale
+          ESP_LOGI("modbus_holding_14", "Write Temperature correction: %.2f°C (raw: %d)", temp, x);
+          id(modbus_temperature_correction_number).make_call().set_value(temp).perform();
+          return true;
+
+      # Holding 104 - Uptime
+      - address: 104
+        value_type: U_DWORD
+        read_lambda: |-
+          int result = (int)id(uptime_sensor).state;
+          ESP_LOGD("modbus_holding_104", "Read Uptime: %d seconds", result);
+          return result;
+
+      # Holding 110 - Baud rate
+      - address: 110
+        value_type: U_WORD
+        read_lambda: |-
+          int result = std::stoul(id(modbus_baud_rate).state) / 100;
+          ESP_LOGD("modbus_holding_110", "Read Baud rate: %d (raw: %d)", result * 100, result);
+          return result;
+        write_lambda: |-
+          std::string baud_rate = std::to_string(x * 100);
+          ESP_LOGI("modbus_holding_110", "Write Baud rate: %s (raw: %d)", baud_rate.c_str(), x);
+          id(modbus_baud_rate).make_call().set_option(baud_rate).perform();
+          return true;
+
+      # Holding 111 - Parity Bit
+      - address: 111
+        value_type: U_WORD
+        read_lambda: |-
+          std::string parity_bit = id(modbus_parity_bit).state;
+          int result = 0;
+          if (parity_bit == "Odd") {
+            result = 1;
+          } else if (parity_bit == "Even") {
+            result = 2;
+          }
+          ESP_LOGD("modbus_holding_111", "Read Parity bit: %s (%d)", parity_bit.c_str(), result);
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_111", "Write Parity bit: %d", x);
+          switch (x) {
+            case 0: id(modbus_parity_bit).make_call().set_option("None").perform(); return true;
+            case 1: id(modbus_parity_bit).make_call().set_option("Odd").perform(); return true;
+            case 2: id(modbus_parity_bit).make_call().set_option("Even").perform(); return true;
+            default: return false;
+          }
+
+      # Holding 112 - Stop Bits
+      - address: 112
+        value_type: U_WORD
+        read_lambda: |-
+          int result = std::stoul(id(modbus_stop_bits).state);
+          ESP_LOGD("modbus_holding_112", "Read Stop bits: %d", result);
+          return result;
+        write_lambda: |-
+          std::string stop_bits = std::to_string(x);
+          ESP_LOGI("modbus_holding_112", "Write Stop bits: %s", stop_bits.c_str());
+          id(modbus_stop_bits).make_call().set_option(stop_bits).perform();
+          return true;
+
+      # Holding 120 - Reboot device
+      - address: 120
+        value_type: U_WORD
+        read_lambda: |-
+          ESP_LOGD("modbus_holding_120", "Read Reboot device: 0");
+          return 0;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_120", "Write Reboot device: %d", x);
+          if (x) {
+            // Schedule asynchronous restart - after modbus response is sent:
+            id(delayed_restart_script).execute();
+          }
+          return true;
+      # Holding 128 - Modbus Address
+      - address: 128
+        value_type: U_WORD
+        read_lambda: |-
+          int result = id(modbus_address_number).state;
+          ESP_LOGD("modbus_holding_128", "Read Modbus address: %d", result);
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_128", "Write Modbus address: %d", x);
+          if (x >= 1 && x <= 247) {
+            id(modbus_address_number).make_call().set_value((float)x).perform();
+            ESP_LOGI("modbus_address", "Modbus address changed via Modbus to: %d", x);
+            return true;
+          } else {
+            ESP_LOGE("modbus_address", "Invalid Modbus address: %d", address);
+            return false;
+          }
+
+      # Input 124 - MCU Temperature
+      - address: 124
+        value_type: S_WORD
+        read_lambda: |-
+          int result = id(mcu_temperature_sensor).state * 10;  // Scale to 0.1 degree resolution
+          ESP_LOGD("modbus_input_124", "Read MCU Temperature: %.1f°C (raw: %d)", id(mcu_temperature_sensor).state, result);
+          return result;
+
+      # Holding 270 - Serial
+      - address: 270
+        value_type: U_DWORD
+        read_lambda: |-
+          uint8_t mac[6] = {0};
+          get_mac_address_raw(mac);
+          uint32_t chipId = ((uint32_t)(mac[0] ^ mac[1] ^ mac[2]) << 24) | ((uint32_t)mac[3] << 16) | ((uint32_t)mac[4] << 8) | ((uint32_t)mac[5]);         
+          ESP_LOGD("modbus_holding_270", "Read Serial: %d", chipId);
+          return chipId;
+
+      # NOTE: Below some modbus registers defined in config-onokom-air-hr-1-mb-b.json but not actually used:
+
+      # Holding 200 - HW Version
+      - address: 200
+        value_type: U_DWORD
+        read_lambda: |-
+          ESP_LOGD("modbus_holding_200", "Read HW Version: 0");
+          return 0;
+
+      # Holding 250 - FW Version
+      - address: 250
+        value_type: U_DWORD
+        read_lambda: |-
+          ESP_LOGD("modbus_holding_250", "Read FW Version: 0");
+          return 0;
+
+      # Input 290 - Signature
+      - address: 290
+        value_type: U_DWORD
+        read_lambda: |-
+          ESP_LOGD("modbus_input_290", "Read Signature: 0");
+          return 0;
+
+      # Input 400 - PROTO Version
+      - address: 400
+        value_type: U_DWORD
+        read_lambda: |-
+          ESP_LOGD("modbus_input_400", "Read PROTO Version: 0");
+          return 0;
+
+      # NOTE: Below some custom modbus registers, not defined in config-onokom-air-hr-1-mb-b.json:
+
+      # Holding 1000 - Factory Reset
+      - address: 1000
+        value_type: U_WORD
+        read_lambda: |-
+          ESP_LOGD("modbus_holding_1000", "Read Factory reset: 0");
+          return 0;
+        write_lambda: |-
+          ESP_LOGI("modbus_holding_1000", "Write Factory reset: %d", x);
+          if (x) {
+            // Schedule asynchronous reset - after modbus response is sent:
+            id(delayed_reset_script).execute();
+          }
+          return true;
+
+      # Coil 1001: Away mode
+      - address: 1001
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY;
+          ESP_LOGD("modbus_coil_1001", "Read Away mode state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_1001", "Write Away mode state: %s", x ? "ON" : "OFF");
+          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_AWAY) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();  
+          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY) {
+            id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
+          }
+          return true;
+
+      # Coil 1003: WiFi Enable
+      - address: 1003
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(wifi_enable_switch).state;
+          ESP_LOGD("modbus_coil_1003", "Read WiFi Enable state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_1003", "Write WiFi Enable state: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(wifi_enable_switch).turn_on();
+          } else {
+            id(wifi_enable_switch).turn_off();
+          }
+          return true;
+
+      # Coil 1004: Send WiFi Status to AC
+      - address: 1004
+        value_type: COIL
+        read_lambda: |-
+          bool result = id(send_wifi_status_to_ac).state;
+          ESP_LOGD("modbus_coil_1004", "Read Send WiFi Status to AC state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_1004", "Write Send WiFi Status to AC state: %s", x ? "ON" : "OFF");
+          if (x) {
+            id(send_wifi_status_to_ac).turn_on();
+          } else {
+            id(send_wifi_status_to_ac).turn_off();
+          }
+          return true;    
