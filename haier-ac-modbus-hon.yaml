@@ -655,16 +655,21 @@ modbus_controller:
           ESP_LOGD("modbus_coil_4", "Read Quiet mode state: %s", result ? "ON" : "OFF");
           return result;
         write_lambda: |-
-          ESP_LOGI("modbus_coil_4", "Write Quiet mode state: ON");
+          ESP_LOGI("modbus_coil_4", "Write Quiet mode state: %s", x ? "ON" : "OFF");
           id(haier_ac).set_quiet_mode_state(x);
           return true;
 
-      # Coil 5: Beeper (NOTE: Not supported in SMARTAIR2)
+      # Coil 5: Beeper
       - address: 5
         value_type: COIL
         read_lambda: |-
-          ESP_LOGD("modbus_coil_5", "Read Beeper state: OFF (not supported)");
-          return 1;
+          bool result = id(haier_ac).get_beeper_state();
+          ESP_LOGD("modbus_coil_5", "Read Beeper state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_5", "Write Beeper state: %s", x ? "ON" : "OFF");
+          id(haier_ac).set_beeper_state(x);
+          return true;
 
       # Coil 6: Eco mode (NOTE: Not supported by haier-esphome)
       - address: 6
@@ -717,12 +722,19 @@ modbus_controller:
           id(haier_ac).set_health_mode(x);
           return true;        
 
-      # Coil 10: Self cleaning (NOTE: Not supported in SMARTAIR2)
+      # Coil 10: Self cleaning
       - address: 10
         value_type: COIL
         read_lambda: |-
-          ESP_LOGD("modbus_coil_10", "Read Self cleaning state: OFF (not supported)");
-          return 0;
+          bool result = id(haier_ac).get_cleaning_status() != esphome::haier::CleaningState::NO_CLEANING;
+          ESP_LOGD("modbus_coil_10", "Read Self cleaning state: %s", result ? "ON" : "OFF");
+          return result;
+        write_lambda: |-
+          ESP_LOGI("modbus_coil_10", "Write Self cleaning state: %s", x ? "ON" : "OFF");
+          if (id(haier_ac).get_cleaning_status() == esphome::haier::CleaningState::NO_CLEANING) {
+            id(haier_ac).start_self_cleaning();
+          }
+          return true;        
 
       # Coil 20: AC connected
       - address: 20
