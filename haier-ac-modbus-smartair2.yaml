@@ -671,14 +671,14 @@ modbus_controller:
       - address: 4
         value_type: COIL
         read_lambda: |-
-          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_COMFORT;
+          bool result = id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) == CLIMATE_PRESET_COMFORT;
           ESP_LOGD("modbus_coil_4", "Read Quiet mode state: %s", result ? "ON" : "OFF");
           return result;
         write_lambda: |-
           ESP_LOGI("modbus_coil_4", "Write Quiet mode state: %s", x ? "ON" : "OFF");
-          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_COMFORT) {
+          if (x && id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) != CLIMATE_PRESET_COMFORT) {
             id(haier_ac).make_call().set_preset(CLIMATE_PRESET_COMFORT).perform();  
-          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_COMFORT) {
+          } else if (!x && id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) == CLIMATE_PRESET_COMFORT) {
             id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
           }
           return true;
@@ -701,14 +701,14 @@ modbus_controller:
       - address: 7
         value_type: COIL
         read_lambda: |-
-          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST;
+          bool result = id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) == CLIMATE_PRESET_BOOST;
           ESP_LOGD("modbus_coil_7", "Read Turbo mode state: %s", result ? "ON" : "OFF");
           return result;
         write_lambda: |-
           ESP_LOGI("modbus_coil_7", "Write Turbo mode state: %s", x ? "ON" : "OFF");
-          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_BOOST) {
+          if (x && id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) != CLIMATE_PRESET_BOOST) {
             id(haier_ac).make_call().set_preset(CLIMATE_PRESET_BOOST).perform();  
-          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST) {
+          } else if (!x && id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) == CLIMATE_PRESET_BOOST) {
             id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
           }
           return true;
@@ -828,6 +828,11 @@ modbus_controller:
           return true;
 
       # Holding 1 - Mode
+      #   1 - Heat
+      #   2 - Cool
+      #   3 - Auto
+      #   4 - Dry
+      #   5 - Fan
       - address: 1
         value_type: U_WORD
         read_lambda: |-
@@ -854,6 +859,12 @@ modbus_controller:
           }
 
       # Holding 2 - Active mode
+      #   0 - Off
+      #   1 - Heat
+      #   2 - Cool
+      #   3 - Auto
+      #   4 - Dry
+      #   5 - Fan
       - address: 2
         value_type: U_WORD
         read_lambda: |-
@@ -940,6 +951,9 @@ modbus_controller:
           return true;
 
       # Holding 6 - Thermostat state
+      #   0 - Idle
+      #   1 - Heating
+      #   2 - Cooling
       - address: 6
         value_type: U_WORD
         read_lambda: |-          
@@ -959,6 +973,10 @@ modbus_controller:
           return result;
 
       # Holding 7 - Fan speed
+      #   0 - Auto
+      #   1 - Low speed
+      #   2 - Medium speed
+      #   3 - High speed
       - address: 7
         value_type: U_WORD
         read_lambda: |-
@@ -983,17 +1001,21 @@ modbus_controller:
           }
 
       # Holding 8 - Smart fan speed
+      #   0 - Auto
+      #   1 - Quite mode
+      #   2 - Low speed
+      #   3 - Medium speed
+      #   4 - High speed
+      #   5 - Turbo mode
       - address: 8
         value_type: U_WORD
         read_lambda: |-
           int result;
-          if(id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_COMFORT) {
+          if (id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) == CLIMATE_PRESET_COMFORT) {
             result = 1;
-          }          
-          else if(id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_BOOST) {
+          } else if (id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) == CLIMATE_PRESET_BOOST) {
             result = 5;
-          }
-          else {
+          } else {
             switch (id(haier_ac).fan_mode.value_or(CLIMATE_FAN_AUTO)) {
               case CLIMATE_FAN_AUTO: result = 0; break;
               case CLIMATE_FAN_LOW: result = 2; break;
@@ -1016,14 +1038,30 @@ modbus_controller:
             default: return false;
           }
 
-      # Holding 9 - Horizontal vanes (NOTE: Not supported in haier-esphome)
+      # Holding 9 - Horizontal vanes (vertical swing) (NOTE: Not supported in SMARTAIR2)
+      #   0 - Stop
+      #   1 - Swing
+      #   2 - Lowest
+      #   3 - Low
+      #   4 - Middle Low
+      #   5 - Middle
+      #   6 - Middle High
+      #   7 - High
+      #   8 - Highest
       - address: 9
         value_type: U_WORD
         read_lambda: |-
           ESP_LOGD("modbus_holding_9", "Read Horizontal vanes: 0 (not supported)");
           return 0;
 
-      # Holding 10 - Vertical vanes (NOTE: Not supported in haier-esphome)
+      # Holding 10 - Vertical vanes (horizontal swing) (NOTE: Not supported in SMARTAIR2)
+      #   0 - Stop
+      #   1 - Swing
+      #   2 - Far Left
+      #   3 - Left
+      #   4 - Middle
+      #   5 - Right
+      #   6 - Far Right
       - address: 10
         value_type: U_WORD
         read_lambda: |-
@@ -1031,6 +1069,10 @@ modbus_controller:
           return 0;
 
       # Holding 11 - Vanes swing
+      #   0 - Stop
+      #   1 - Horizontal and vertical swing
+      #   2 - Swinging horizontal blinds
+      #   3 - Swinging vertical blinds
       - address: 11
         value_type: U_WORD
         read_lambda: |-
@@ -1089,6 +1131,9 @@ modbus_controller:
           return true;
 
       # Holding 111 - Parity Bit
+      #   0 - none
+      #   1 - odd
+      #   2 - even
       - address: 111
         value_type: U_WORD
         read_lambda: |-
@@ -1172,7 +1217,7 @@ modbus_controller:
           ESP_LOGD("modbus_holding_270", "Read Serial: %d", chipId);
           return chipId;
 
-      # NOTE: Below some modbus registers defined in config-onokom-air-hr-1-mb-b.json but not actually used:
+      # NOTE: Below some common WirenBoard modbus registers not actually used:
 
       # Holding 200 - HW Version
       - address: 200
@@ -1202,7 +1247,7 @@ modbus_controller:
           ESP_LOGD("modbus_input_400", "Read PROTO Version: 0");
           return 0;
 
-      # NOTE: Below some custom modbus registers, not defined in config-onokom-air-hr-1-mb-b.json:
+      # NOTE: Below are some custom modbus registers, not defined in WirenBoard Haier AC template
 
       # Holding 1000 - Factory Reset
       - address: 1000
@@ -1222,14 +1267,14 @@ modbus_controller:
       - address: 1001
         value_type: COIL
         read_lambda: |-
-          bool result = id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY;
+          bool result = id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) == CLIMATE_PRESET_AWAY;
           ESP_LOGD("modbus_coil_1001", "Read Away mode state: %s", result ? "ON" : "OFF");
           return result;
         write_lambda: |-
           ESP_LOGI("modbus_coil_1001", "Write Away mode state: %s", x ? "ON" : "OFF");
-          if (x && id(haier_ac).preset.value_or(NULL) != CLIMATE_PRESET_AWAY) {
+          if (x && id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) != CLIMATE_PRESET_AWAY) {
             id(haier_ac).make_call().set_preset(CLIMATE_PRESET_AWAY).perform();  
-          } else if (!x && id(haier_ac).preset.value_or(NULL) == CLIMATE_PRESET_AWAY) {
+          } else if (!x && id(haier_ac).preset.value_or(CLIMATE_PRESET_NONE) == CLIMATE_PRESET_AWAY) {
             id(haier_ac).make_call().set_preset(CLIMATE_PRESET_NONE).perform();  
           }
           return true;
