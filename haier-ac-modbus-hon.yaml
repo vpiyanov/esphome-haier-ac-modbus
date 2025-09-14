@@ -526,6 +526,12 @@ number:
 
 # Additional sensors for monitoring
 sensor:
+  - platform: haier
+    haier_id: haier_ac
+    outdoor_temperature:
+      id: outdoor_temperature_sensor
+      name: "[Modbus Holding 4] Outdoor temperature"
+
   - platform: internal_temperature
     id: mcu_temperature_sensor
     name: "[Modbus Input 124] MCU temperature"
@@ -907,12 +913,13 @@ modbus_controller:
           }
           return false;
 
-      # Holding 4 - Outdoor air temperature (NOTE: Not supported in SMARTAIR2)
+      # Holding 4 - Outdoor air temperature
       - address: 4
         value_type: S_WORD
         read_lambda: |-
-          ESP_LOGD("modbus_holding_4", "Read Outdoor temperature: -32768 (not supported)");
-          return -32768;
+          int result = id(outdoor_temperature_sensor).state * 10;  // Scale to 0.1 degree resolution
+          ESP_LOGD("modbus_holding_4", "Read Outdoor temperature: %.1f°C (raw: %d)", id(outdoor_temperature_sensor).state, result);
+          return result;          
 
       # Holding 5 - Target temperature
       - address: 5
