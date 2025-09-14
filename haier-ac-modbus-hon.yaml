@@ -127,6 +127,9 @@ web_server:
     - id: ac_configuration
       name: "AC Configuration"
       sorting_weight: 0
+    - id: ac_diagnostic
+      name: "AC Diagnostic"
+      sorting_weight: 1
 
 captive_portal:
 
@@ -170,6 +173,13 @@ switch:
       icon: "mdi:monitor"
       web_server:
         sorting_group_id: ac_configuration
+    beeper:
+      name: "[Modbus Coil 5] Beeper"
+      web_server:
+        sorting_group_id: ac_configuration
+    quiet_mode:
+      name: "[Modbus Coil 4] Quiet mode"
+      entity_category: ""
 
   # Used to store Modbus register values:
   - platform: template
@@ -269,6 +279,13 @@ button:
     web_server:
       sorting_weight: 110
 
+  - platform: haier
+    haier_id: haier_ac
+    self_cleaning:
+      name: "[Modbus Coil 10] Start self cleaning"
+    steri_cleaning:
+      name: "[Modbus Coil 10] Start 56°C steri-cleaning"
+
 select:
   - id: haier_preset_select
     name: "[Modbus Coils 7, 8, 1001 and Holding 8] Preset"
@@ -362,6 +379,109 @@ select:
           } else {
             id(haier_ac).make_call().set_swing_mode(CLIMATE_SWING_OFF).perform();
           }
+
+  - platform: template
+    id: haier_ac_vertical_direction
+    name: "[Modbus Holding 9] Horizontal vanes"
+    icon: mdi:arrow-expand-vertical
+    update_interval: 5s
+    options:
+      - Health Up
+      - Max Up
+      - Up
+      - Center
+      - Down
+      - Max Down
+      - Health Down
+      - Auto
+    lambda: >-
+      switch (id(haier_ac).get_vertical_airflow().value_or(esphome::haier::hon_protocol::VerticalSwingMode::CENTER))
+      {
+          case esphome::haier::hon_protocol::VerticalSwingMode::HEALTH_UP:
+              return std::string("Health Up");
+          case esphome::haier::hon_protocol::VerticalSwingMode::MAX_UP:
+              return std::string("Max Up");
+          case esphome::haier::hon_protocol::VerticalSwingMode::UP:
+              return std::string("Up");
+          default:
+          case esphome::haier::hon_protocol::VerticalSwingMode::CENTER:
+              return std::string("Center");
+          case esphome::haier::hon_protocol::VerticalSwingMode::DOWN:
+              return std::string("Down");
+          case esphome::haier::hon_protocol::VerticalSwingMode::MAX_DOWN:
+              return std::string("Max Down");
+          case esphome::haier::hon_protocol::VerticalSwingMode::HEALTH_DOWN:
+              return std::string("Health Down");
+          case esphome::haier::hon_protocol::VerticalSwingMode::AUTO:
+          case esphome::haier::hon_protocol::VerticalSwingMode::AUTO_SPECIAL:
+              return std::string("Auto");
+      }
+    set_action:
+      - climate.haier.set_vertical_airflow:
+          id: haier_ac
+          vertical_airflow: !lambda >-
+            if (x == "Health Up")
+                return esphome::haier::hon_protocol::VerticalSwingMode::HEALTH_UP;
+            else if (x == "Max Up")
+                return esphome::haier::hon_protocol::VerticalSwingMode::MAX_UP;
+            else if (x == "Up")
+                return esphome::haier::hon_protocol::VerticalSwingMode::UP;
+            else if (x == "Down")
+                return esphome::haier::hon_protocol::VerticalSwingMode::DOWN;
+            else if (x == "Max Down")
+                return esphome::haier::hon_protocol::VerticalSwingMode::MAX_DOWN;
+            else if (x == "Health Down")
+                return esphome::haier::hon_protocol::VerticalSwingMode::HEALTH_DOWN;
+            else if (x == "Auto")
+                return esphome::haier::hon_protocol::VerticalSwingMode::AUTO;
+            else
+                return esphome::haier::hon_protocol::VerticalSwingMode::CENTER;
+  - platform: template
+    id: haier_ac_horizontal_direction
+    name: "[Modbus Holding 10] Vertical vanes"
+    icon: mdi:arrow-expand-horizontal
+    update_interval: 5s
+    options:
+      - Max Left
+      - Left
+      - Center
+      - Right
+      - Max Right
+      - Auto
+    lambda: >-
+      switch (id(haier_ac).get_horizontal_airflow().value_or(esphome::haier::hon_protocol::HorizontalSwingMode::CENTER))
+      {
+          case esphome::haier::hon_protocol::HorizontalSwingMode::MAX_LEFT:
+              return std::string("Max Left");
+          case esphome::haier::hon_protocol::HorizontalSwingMode::LEFT:
+              return std::string("Left");
+          default:
+          case esphome::haier::hon_protocol::HorizontalSwingMode::CENTER:
+              return std::string("Center");
+          case esphome::haier::hon_protocol::HorizontalSwingMode::RIGHT:
+              return std::string("Right");
+          case esphome::haier::hon_protocol::HorizontalSwingMode::MAX_RIGHT:
+              return std::string("Max Right");
+          case esphome::haier::hon_protocol::HorizontalSwingMode::AUTO:
+              return std::string("Auto");
+      }
+    set_action:
+      - climate.haier.set_horizontal_airflow:
+          id: haier_ac
+          horizontal_airflow: !lambda >-
+            if (x == "Max Left")
+                return esphome::haier::hon_protocol::HorizontalSwingMode::MAX_LEFT;
+            else if (x == "Left")
+                return esphome::haier::hon_protocol::HorizontalSwingMode::LEFT;
+            else if (x == "Right")
+                return esphome::haier::hon_protocol::HorizontalSwingMode::RIGHT;
+            else if (x == "Max Right")
+                return esphome::haier::hon_protocol::HorizontalSwingMode::MAX_RIGHT;
+            else if (x == "Auto")
+                return esphome::haier::hon_protocol::HorizontalSwingMode::AUTO;
+            else
+                return esphome::haier::hon_protocol::HorizontalSwingMode::CENTER;
+
 
   - id: modbus_baud_rate
     name: "[Modbus Holding 110] Baud rate"
@@ -467,6 +587,7 @@ binary_sensor:
         then: # Short click action:
           - switch.toggle: wifi_enable_switch
           - logger.log: "Boot button short press - WiFi toggled"
+            
   - platform: template
     id: boot_button_longpress
     name: "Boot Button Long Press"
@@ -485,6 +606,33 @@ binary_sensor:
               format: "Performing factory reset - all settings will be cleared!"
           - delay: 10s
           - button.press: factory_reset_button
+
+  - platform: haier
+    haier_id: haier_ac
+    compressor_status:
+      name: Compressor Status
+      web_server:
+        sorting_group_id: ac_diagnostic
+    defrost_status:
+      name: Defrost Status
+      web_server:
+        sorting_group_id: ac_diagnostic
+    four_way_valve_status:
+      name: Four-way Valve Status
+      web_server:
+        sorting_group_id: ac_diagnostic
+    indoor_electric_heating_status:
+      name: Indoor Electric Heating Status
+      web_server:
+        sorting_group_id: ac_diagnostic
+    indoor_fan_status:
+      name: Indoor Fan Status
+      web_server:
+        sorting_group_id: ac_diagnostic
+    outdoor_fan_status:
+      name: Outdoor Fan Status
+      web_server:
+        sorting_group_id: ac_diagnostic
 
 number:
   # Used to store Modbus register values:
@@ -528,9 +676,48 @@ number:
 sensor:
   - platform: haier
     haier_id: haier_ac
+    compressor_current:
+      name: Compressor Current
+      web_server:
+        sorting_group_id: ac_diagnostic
+    compressor_frequency:
+      name: Compressor Frequency
+      web_server:
+        sorting_group_id: ac_diagnostic
+    expansion_valve_open_degree:
+      name: Expansion Valve Open Degree
+      web_server:
+        sorting_group_id: ac_diagnostic
+    humidity:
+      name: Indoor Humidity
+    indoor_coil_temperature:
+      name: Indoor Coil Temperature
+      web_server:
+        sorting_group_id: ac_diagnostic
+    outdoor_coil_temperature:
+      name: Outdoor Coil Temperature
+      web_server:
+        sorting_group_id: ac_diagnostic
+    outdoor_defrost_temperature:
+      name: Outdoor Defrost Temperature
+      web_server:
+        sorting_group_id: ac_diagnostic
+    outdoor_in_air_temperature:
+      name: Outdoor In Air Temperature
+      web_server:
+        sorting_group_id: ac_diagnostic
+    outdoor_out_air_temperature:
+      name: Outdoor Out Air Temperature
+      web_server:
+        sorting_group_id: ac_diagnostic
     outdoor_temperature:
       id: outdoor_temperature_sensor
       name: "[Modbus Holding 4] Outdoor temperature"
+    power:
+      name: Power
+      web_server:
+        sorting_group_id: ac_diagnostic
+
 
   - platform: internal_temperature
     id: mcu_temperature_sensor
@@ -581,6 +768,15 @@ sensor:
     entity_category: diagnostic
 
 text_sensor:
+  - platform: haier
+    haier_id: haier_ac
+    cleaning_status:
+      name: "[Modbus Coil 10] Cleaning status"
+    protocol_version:
+      name: "Protocol version"
+      web_server:
+        sorting_group_id: ac_diagnostic
+
   - platform: wifi_info
     ip_address:
       name: WiFi IP Address
