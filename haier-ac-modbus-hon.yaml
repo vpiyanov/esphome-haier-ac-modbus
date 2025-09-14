@@ -598,6 +598,19 @@ text_sensor:
       name: WiFi DNS Address
       icon: "mdi:wifi"
 
+  - platform: template
+    id: device_serial_number
+    name: "[Modbus Holding 270] Device Serial Number"
+    icon: "mdi:identifier"
+    lambda: |-
+      uint8_t mac[6] = {0};
+      get_mac_address_raw(mac);
+      uint32_t chipId = ((uint32_t)(mac[0] ^ mac[1] ^ mac[2]) << 24) | ((uint32_t)mac[3] << 16) | ((uint32_t)mac[4] << 8) | ((uint32_t)mac[5]);
+      return std::to_string(chipId);
+    update_interval: 60s
+    entity_category: diagnostic
+
+
 script:
   - id: delayed_restart_script
     mode: single
@@ -1268,14 +1281,12 @@ modbus_controller:
           ESP_LOGD("modbus_input_124", "Read MCU Temperature: %.1f°C (raw: %d)", id(mcu_temperature_sensor).state, result);
           return result;
 
-      # Holding 270 - Serial
+      # Holding 270 - Serial Number
       - address: 270
         value_type: U_DWORD
         read_lambda: |-
-          uint8_t mac[6] = {0};
-          get_mac_address_raw(mac);
-          uint32_t chipId = ((uint32_t)(mac[0] ^ mac[1] ^ mac[2]) << 24) | ((uint32_t)mac[3] << 16) | ((uint32_t)mac[4] << 8) | ((uint32_t)mac[5]);         
-          ESP_LOGD("modbus_holding_270", "Read Serial: %d", chipId);
+          uint32_t chipId = std::stoul(id(device_serial_number).state);
+          ESP_LOGD("modbus_holding_270", "Read Serial: %u", chipId);
           return chipId;
 
       # NOTE: Below some common WirenBoard modbus registers not actually used:
