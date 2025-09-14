@@ -34,11 +34,6 @@ esphome:
           ESP_LOGI("boot", "Setting Modbus address to: %d", address);
           id(modbus_controller_server).set_address(address);
           
-          // Apply restored alternative swing control setting
-          bool alt_swing = id(alternative_swing_control).state;
-          ESP_LOGI("boot", "Setting alternative swing control to: %s", alt_swing ? "ON" : "OFF");
-          id(haier_ac).set_alternative_swing_control(alt_swing);
-
           // Apply restored UART settings
           uint32_t baud_rate = std::stoul(id(modbus_baud_rate).state);
           UARTParityOptions parity = UART_CONFIG_PARITY_NONE;
@@ -70,6 +65,12 @@ esphome:
           bool send_wifi_status = id(send_wifi_status_to_ac).state;
           ESP_LOGI("boot", "Setting send WiFi status to AC to: %s", send_wifi_status ? "ON" : "OFF");
           id(haier_ac).set_send_wifi(send_wifi_status);
+          
+          // Apply restored alternative swing control setting
+          bool alt_swing = id(alternative_swing_control).state;
+          ESP_LOGI("boot", "Setting alternative swing control to: %s", alt_swing ? "ON" : "OFF");
+          id(haier_ac).set_alternative_swing_control(alt_swing);
+
 
 # Enable Home Assistant API
 api:
